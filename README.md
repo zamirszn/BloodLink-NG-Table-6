@@ -85,4 +85,8 @@ DEBUG=True
 
 MIT
 
+git config --global user.email "email_here"
+
+git config --global user.name "Full Name"
+
 

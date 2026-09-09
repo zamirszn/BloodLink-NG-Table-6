@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>BloodLink NG - Donor Registration</title>
+</head>
+<body>
+
+    <h1>Donor Registration</h1>
+
+    <form method="POST">
+        {% csrf_token %}
+
+        {{ form.as_p }}
+
+        <button type="submit">Register as a Donor</button>
+    </form>
+
+</body>
+</html>
