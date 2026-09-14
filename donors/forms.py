@@ -60,3 +60,17 @@ class DonorForm(forms.ModelForm):
             "last_donation",
             "availability",
         ]
+
+    def clean(self):
+        cleaned_data = super().clean()
+
+        donation_status = cleaned_data.get("donation_status")
+        last_donation = cleaned_data.get("last_donation")
+
+        if donation_status == "before" and not last_donation:
+            self.add_error(
+                "last_donation",
+                "Please enter your last donation date."
+            )
+
+        return cleaned_data

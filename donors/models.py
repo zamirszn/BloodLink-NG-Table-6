@@ -8,4 +8,9 @@ class Donor(models.Model):
     phone = models.CharField(max_length=20)
     last_donation = models.DateField(null=True, blank=True)
     availability = models.BooleanField(default=True)
+
+    def __str__(self):
+        return self.name
+
 # Create your models here.
+
