@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Search Blood Donors</title>
+</head>
+
+<body>
+
+    <h1>Find a Blood Donor</h1>
+
+    <form method="GET" action="">
+        {{ form.as_p }}
+
+        <button type="submit">Search</button>
+    </form>
+
+    <hr>
+
+    <h2>Available Donors</h2>
+
+    {% for donor in donors %}
+        <div>
+            <h3>{{ donor.name }}</h3>
+
+            <p>
+                <strong>Blood Type:</strong> {{ donor.blood_type }}<br>
+                <strong>Genotype:</strong> {{ donor.genotype }}<br>
+                <strong>Location:</strong> {{ donor.location }}<br>
+                <strong>Phone:</strong> {{ donor.phone }}<br>
+                <strong>Available:</strong> Yes
+            </p>
+        </div>
+
+        <hr>
+
+    {% empty %}
+        <p>No eligible donors found.</p>
+    {% endfor %}
+
+</body>
+</html>

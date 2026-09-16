@@ -74,3 +74,37 @@ class DonorForm(forms.ModelForm):
             )
 
         return cleaned_data
+
+
+class DonorSearchForm(forms.Form):
+
+    blood_type = forms.ChoiceField(
+        choices=[
+            ("", "Any blood type"),
+            ("A+", "A+"),
+            ("A-", "A-"),
+            ("B+", "B+"),
+            ("B-", "B-"),
+            ("AB+", "AB+"),
+            ("AB-", "AB-"),
+            ("O+", "O+"),
+            ("O-", "O-"),
+        ],
+        required=False
+    )
+
+    location = forms.CharField(
+        max_length=200,
+        required=False,
+        label="Location"
+    )
+
+    availability = forms.ChoiceField(
+        choices=[
+            ("", "Any availability"),
+            ("True", "Available"),
+            ("False", "Not available"),
+        ],
+        required=False,
+        label="Availability"
+    )
