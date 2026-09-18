@@ -89,4 +89,8 @@ git config --global user.email "email_here"
 
 git config --global user.name "Full Name"
 
+## Registration server page
+for faith registration page u go or search for this server http://127.0.0.1:8000/
 
+## For search server page
+and for the the search i was creating then realised i wasn't suppose to do that so this is the server http://127.0.0.1:8000/search/
