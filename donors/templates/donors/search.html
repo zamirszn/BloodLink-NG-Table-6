@@ -88,9 +88,17 @@
 
     {% if recipient_type %}
         <p>
-            Showing donors whose blood type is compatible with a
-            <strong>{{ recipient_type }}</strong> recipient:
+            Showing only donors who can donate to a
+            <strong>{{ recipient_type }}</strong> recipient.
+            Compatible donor blood types are:
             {{ compatible_types|join:", " }}.
+        </p>
+    {% else %}
+        <p>
+            No recipient blood type selected, so every eligible donor is
+            listed regardless of blood type. These donors are not shown as
+            compatible with a specific recipient &mdash; choose a recipient
+            blood type above to check compatibility.
         </p>
     {% endif %}
 
@@ -114,10 +122,10 @@
             <p class="donor-status">
                 {% if recipient_type %}
                     <strong>Compatible with recipient:</strong> {{ recipient_type }}
-                    (<span class="status-ok">compatible</span>)<br>
+                    &mdash; <span class="status-ok">Yes</span><br>
                 {% else %}
                     <strong>Compatibility:</strong>
-                    Not checked (no recipient blood type selected)<br>
+                    Not checked &mdash; no recipient blood type selected<br>
                 {% endif %}
 
                 <strong>90-Day Eligibility:</strong>
@@ -144,7 +152,7 @@
         <p>
             No eligible donors matched your search.
             Donors who donated within the last 90 days are not shown.
-            Try a different blood type, location, or availability.
+            Try a different recipient blood type, location, or availability.
         </p>
     {% endfor %}
 

@@ -83,6 +83,12 @@ class DonorSearchForm(forms.Form):
         label="Recipient Blood Type",
         # The recipient's blood type, not the donor's: the search returns
         # every donor whose blood type the recipient can receive.
+        help_text=(
+            "Select the blood type of the person who needs blood. "
+            "We'll show compatible donors. Leave it as "
+            "\"Any blood type\" to list every eligible donor without "
+            "checking compatibility against a recipient."
+        ),
         choices=[("", "Any blood type")] + [(t, t) for t in ALL_BLOOD_TYPES],
         required=False
     )
