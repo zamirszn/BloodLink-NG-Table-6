@@ -34,8 +34,29 @@ def donor_dashboard(request):
     if donor_id is not None:
         donor = Donor.objects.filter(pk=donor_id).first()
 
+    # This is the SAME 90-day rule the search view applies, repeated here
+    # only so the dashboard can show this donor their own status. The rule
+    # itself is unchanged: a donor who has never donated is eligible, and
+    # otherwise their last donation must be at least 90 days ago.
+    ninety_days_ago = date.today() - timedelta(days=90)
+
+    is_eligible = False
+    next_eligible_date = None
+
+    if donor is not None:
+        if donor.last_donation is None:
+            is_eligible = True
+        else:
+            is_eligible = donor.last_donation <= ninety_days_ago
+            # The first day the 90-day wait is over. Derived from the same
+            # cutoff above, purely for display.
+            next_eligible_date = donor.last_donation + timedelta(days=90)
+
     return render(request, "donors/dashboard.html", {
         "donor": donor,
+        "ninety_days_ago": ninety_days_ago,
+        "is_eligible": is_eligible,
+        "next_eligible_date": next_eligible_date,
     })
 
 
@@ -100,4 +121,7 @@ def search_donors(request):
         "donors": donors,
         "recipient_type": recipient_type,
         "compatible_types": compatible_donor_types(recipient_type),
+        # Exposed so each result card can show the 90-day eligibility
+        # status using the same cutoff that filtered the queryset above.
+        "ninety_days_ago": ninety_days_ago,
     })

@@ -1,7 +1,56 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
+    <meta charset="utf-8">
     <title>Search Blood Donors</title>
+
+    <style>
+        .donor-card {
+            border: 1px solid #ccc;
+            border-radius: 8px;
+            padding: 16px;
+            margin-bottom: 16px;
+        }
+        .donor-card h3 {
+            margin-top: 0;
+        }
+        .donor-details,
+        .donor-status {
+            line-height: 1.7;
+            margin-bottom: 12px;
+        }
+        .status-ok {
+            color: #1a7f37;
+            font-weight: bold;
+        }
+        .status-bad {
+            color: #b42318;
+            font-weight: bold;
+        }
+        .contact-donor {
+            display: inline-block;
+            padding: 12px 20px;
+            background-color: #b30000;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-size: 16px;
+            cursor: pointer;
+            text-decoration: none;
+        }
+        .contact-donor:hover {
+            background-color: #8f0000;
+        }
+        .contact-donor:disabled {
+            background-color: #999;
+            cursor: not-allowed;
+        }
+        .donor-note {
+            margin: 8px 0 0;
+            color: #666;
+            font-size: 14px;
+        }
+    </style>
 </head>
 
 <body>
@@ -31,24 +80,47 @@
     {% endif %}
 
     {% for donor in donors %}
-        <div>
+        <div class="donor-card">
             <h3>{{ donor.name }}</h3>
 
-            <p>
+            <p class="donor-details">
                 <strong>Blood Type:</strong> {{ donor.blood_type }}<br>
-                {% if recipient_type %}
-                    <strong>Compatible with recipient:</strong> {{ recipient_type }}<br>
-                {% endif %}
                 <strong>Genotype:</strong> {{ donor.genotype }}<br>
                 <strong>Location:</strong> {{ donor.location }}<br>
                 <strong>Phone:</strong> {{ donor.phone }}<br>
                 <strong>Available:</strong> {{ donor.availability|yesno:"Yes,No" }}<br>
                 <strong>Last Donation:</strong> {{ donor.last_donation|default:"Never donated" }}
             </p>
+
+            <p class="donor-status">
+                {% if recipient_type %}
+                    <strong>Compatible with recipient:</strong> {{ recipient_type }}
+                    (<span class="status-ok">compatible</span>)<br>
+                {% else %}
+                    <strong>Compatibility:</strong>
+                    Not checked (no recipient blood type selected)<br>
+                {% endif %}
+
+                <strong>90-Day Eligibility:</strong>
+                {% if donor.last_donation and donor.last_donation > ninety_days_ago %}
+                    <span class="status-bad">Not passed</span>
+                {% else %}
+                    <span class="status-ok">Passed</span>
+                {% endif %}
+            </p>
+
+            {# Contact the donor by phone. tel_phone strips formatting so the
+               value is safe inside the attribute; Django still escapes it on
+               output. Donors with no usable number get a disabled button
+               rather than a broken tel: link. #}
+            {% if donor.tel_phone %}
+                <a class="contact-donor" href="tel:{{ donor.tel_phone }}">Contact Donor</a>
+            {% else %}
+                <button type="button" class="contact-donor" disabled
+                        title="This donor has no phone number on file.">Contact Donor</button>
+                <p class="donor-note">No phone number on file.</p>
+            {% endif %}
         </div>
-
-        <hr>
-
     {% empty %}
         <p>
             No eligible donors matched your search.
