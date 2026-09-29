@@ -285,10 +285,10 @@
     <div class="topbar-inner">
         <a class="brand" href="{% url 'donor_dashboard' %}">🩸 BloodLink NG</a>
 
+        {# The dashboard's actions are the buttons below the cards. Keep this
+           nav to just the current page so those two links are not repeated. #}
         <nav class="nav-links">
             <a class="active" href="{% url 'donor_dashboard' %}">Dashboard</a>
-            <a href="{% url 'search_donors' %}">Find a Donor</a>
-            <a href="{% url 'register_donor' %}">Register</a>
         </nav>
     </div>
 </header>
