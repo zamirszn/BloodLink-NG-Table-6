@@ -1,4 +1,4 @@
-from django.shortcuts import render
+from django.shortcuts import redirect, render
 from datetime import date, timedelta
 from .forms import DonorForm, DonorSearchForm
 from .models import Donor
@@ -9,18 +9,31 @@ def register_donor(request):
         form = DonorForm(request.POST)
 
         if form.is_valid():
-            form.save()
+            donor = form.save()
 
-            return render(request, "donors/register.html", {
-                "form": DonorForm(),
-                "success": True
-            })
+            # Remember which donor just registered so /dashboard/ can show them.
+            request.session["donor_id"] = donor.pk
+
+            return redirect("donor_dashboard")
 
     else:
         form = DonorForm()
 
     return render(request, "donors/register.html", {
         "form": form
+    })
+
+
+def donor_dashboard(request):
+    donor_id = request.session.get("donor_id")
+
+    donor = None
+
+    if donor_id is not None:
+        donor = Donor.objects.filter(pk=donor_id).first()
+
+    return render(request, "donors/dashboard.html", {
+        "donor": donor,
     })
 
 
