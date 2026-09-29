@@ -257,6 +257,18 @@
             border-color: #8f0000;
         }
 
+        /* ---------- Flash message ---------- */
+
+        .flash {
+            margin: 0 0 20px;
+            padding: 14px 16px;
+            border-radius: 8px;
+            background-color: #e6f4ea;
+            color: #1a7f37;
+            border-left: 4px solid #1a7f37;
+            font-weight: bold;
+        }
+
         /* ---------- Empty state ---------- */
 
         .empty {
@@ -285,8 +297,10 @@
     <div class="topbar-inner">
         <a class="brand" href="{% url 'donor_dashboard' %}">🩸 BloodLink NG</a>
 
-        {# The dashboard's actions are the buttons below the cards. Keep this
-           nav to just the current page so those two links are not repeated. #}
+        {% comment %}
+        The dashboard's actions are the buttons below the cards. Keep this
+        nav to just the current page so those links are not repeated.
+        {% endcomment %}
         <nav class="nav-links">
             <a class="active" href="{% url 'donor_dashboard' %}">Dashboard</a>
         </nav>
@@ -294,6 +308,12 @@
 </header>
 
 <main class="page">
+
+    {% if messages %}
+        {% for message in messages %}
+            <p class="flash">{{ message }}</p>
+        {% endfor %}
+    {% endif %}
 
     {% if donor %}
 
@@ -416,6 +436,10 @@
         <div class="actions">
             <a class="button" href="{% url 'search_donors' %}">
                 Find a Donor
+            </a>
+
+            <a class="button button-secondary" href="{% url 'edit_donor' %}">
+                Edit Profile
             </a>
 
             <a class="button button-secondary" href="{% url 'register_donor' %}">

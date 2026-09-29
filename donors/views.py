@@ -1,9 +1,25 @@
+from django.contrib import messages
 from django.db.models import Q
 from django.shortcuts import redirect, render
 from datetime import date, timedelta
 from .compatibility import compatible_donor_types
 from .forms import DonorForm, DonorSearchForm
 from .models import Donor
+
+
+def current_donor(request):
+    """The donor this browser session belongs to, or None.
+
+    There is no authentication here: the donor ID written to the session at
+    registration is what identifies the current donor. Every view that needs
+    "my donor" goes through this one lookup so the rule stays in one place.
+    """
+    donor_id = request.session.get("donor_id")
+
+    if donor_id is None:
+        return None
+
+    return Donor.objects.filter(pk=donor_id).first()
 
 
 def register_donor(request):
@@ -27,12 +43,7 @@ def register_donor(request):
 
 
 def donor_dashboard(request):
-    donor_id = request.session.get("donor_id")
-
-    donor = None
-
-    if donor_id is not None:
-        donor = Donor.objects.filter(pk=donor_id).first()
+    donor = current_donor(request)
 
     # This is the SAME 90-day rule the search view applies, repeated here
     # only so the dashboard can show this donor their own status. The rule
@@ -57,6 +68,41 @@ def donor_dashboard(request):
         "ninety_days_ago": ninety_days_ago,
         "is_eligible": is_eligible,
         "next_eligible_date": next_eligible_date,
+    })
+
+
+def edit_donor(request):
+    donor = current_donor(request)
+
+    # No donor in this session, or the record is gone: this session has
+    # nothing it is allowed to edit. Never fall back to some other donor's
+    # record — the dashboard already explains the situation and offers
+    # registration, so send them there.
+    if donor is None:
+        return redirect("donor_dashboard")
+
+    if request.method == "POST":
+        # Bound to the EXISTING record, so a valid save updates this donor
+        # instead of inserting a new one.
+        form = DonorForm(request.POST, instance=donor)
+
+        if form.is_valid():
+            form.save()
+
+            messages.success(request, "Your profile has been updated.")
+
+            return redirect("donor_dashboard")
+
+    else:
+        # The stored record only knows the last donation date, so tell the
+        # form which of its two "have you donated before?" answers that means.
+        form = DonorForm(instance=donor, initial={
+            "donation_status": "before" if donor.last_donation else "never"
+        })
+
+    return render(request, "donors/edit_profile.html", {
+        "form": form,
+        "donor": donor,
     })
 
 
