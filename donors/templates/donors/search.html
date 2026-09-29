@@ -18,23 +18,43 @@
 
     <h2>Available Donors</h2>
 
+    {% if recipient_type %}
+        <p>
+            Showing donors whose blood type is compatible with a
+            <strong>{{ recipient_type }}</strong> recipient:
+            {{ compatible_types|join:", " }}.
+        </p>
+    {% endif %}
+
+    {% if donors %}
+        <p>{{ donors|length }} eligible donor{{ donors|length|pluralize }} found.</p>
+    {% endif %}
+
     {% for donor in donors %}
         <div>
             <h3>{{ donor.name }}</h3>
 
             <p>
                 <strong>Blood Type:</strong> {{ donor.blood_type }}<br>
+                {% if recipient_type %}
+                    <strong>Compatible with recipient:</strong> {{ recipient_type }}<br>
+                {% endif %}
                 <strong>Genotype:</strong> {{ donor.genotype }}<br>
                 <strong>Location:</strong> {{ donor.location }}<br>
                 <strong>Phone:</strong> {{ donor.phone }}<br>
-                <strong>Available:</strong> Yes
+                <strong>Available:</strong> {{ donor.availability|yesno:"Yes,No" }}<br>
+                <strong>Last Donation:</strong> {{ donor.last_donation|default:"Never donated" }}
             </p>
         </div>
 
         <hr>
 
     {% empty %}
-        <p>No eligible donors found.</p>
+        <p>
+            No eligible donors matched your search.
+            Donors who donated within the last 90 days are not shown.
+            Try a different blood type, location, or availability.
+        </p>
     {% endfor %}
 
 </body>

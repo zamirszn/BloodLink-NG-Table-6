@@ -1,5 +1,7 @@
+from django.db.models import Q
 from django.shortcuts import redirect, render
 from datetime import date, timedelta
+from .compatibility import compatible_donor_types
 from .forms import DonorForm, DonorSearchForm
 from .models import Donor
 
@@ -42,17 +44,42 @@ def search_donors(request):
 
     donors = Donor.objects.all()
 
-    # 90-day eligibility check
+    # The blood type the *recipient* needs. Used by the template to label
+    # each result as compatible with the person who needs blood.
+    recipient_type = ""
+
+    # Only show donors who are eligible.
+    # They must have never donated OR their last donation must be at
+    # least 90 days ago.
+    #
+    # This is applied BEFORE (and independently of) the form filters.
+    # Opening /search/ with no parameters leaves the form unbound, so
+    # relying on form.is_valid() here would silently skip the rule.
     ninety_days_ago = date.today() - timedelta(days=90)
+
+    donors = donors.filter(
+        Q(last_donation__isnull=True)
+        | Q(last_donation__lte=ninety_days_ago)
+    )
 
     if form.is_valid():
         blood_type = form.cleaned_data.get("blood_type")
         location = form.cleaned_data.get("location")
         availability = form.cleaned_data.get("availability")
 
-        # Filter by blood type
+        # Filter by recipient blood type.
+        #
+        # The selected value is the RECIPIENT's blood type, so a donor
+        # matches when their own blood type is one the recipient can
+        # receive. The rules live in compatibility.py, not here.
+        #
+        # An empty selection means "Any blood type": no restriction.
         if blood_type:
-            donors = donors.filter(blood_type=blood_type)
+            recipient_type = blood_type
+
+            donors = donors.filter(
+                blood_type__in=compatible_donor_types(blood_type)
+            )
 
         # Filter by location
         if location:
@@ -62,20 +89,15 @@ def search_donors(request):
 
         # Filter by availability
         if availability:
-            donors = donors.filter(
-                availability=availability
-            )
+            is_available = availability == "True"
 
-        # Only show donors who are eligible
-        # They must have never donated OR
-        # their last donation must be at least 90 days ago.
-        donors = donors.filter(
-            last_donation__isnull=True
-        ) | donors.filter(
-            last_donation__lte=ninety_days_ago
-        )
+            donors = donors.filter(
+                availability=is_available
+            )
 
     return render(request, "donors/search.html", {
         "form": form,
         "donors": donors,
+        "recipient_type": recipient_type,
+        "compatible_types": compatible_donor_types(recipient_type),
     })
