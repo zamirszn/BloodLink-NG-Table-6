@@ -10,7 +10,10 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/6.1/ref/settings/
 """
 
+import copy
 from pathlib import Path
+
+from django.utils.log import DEFAULT_LOGGING
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -38,6 +41,7 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'donors',
+    'blood_requests',
 ]
 
 MIDDLEWARE = [
@@ -125,4 +129,33 @@ MAILERS = {
     'default': {
         'BACKEND': 'django.core.mail.backends.console.EmailBackend',
     },
+}
+
+
+# Donor notifications (blood requests, part 3)
+# https://docs.djangoproject.com/en/6.1/ref/settings/#std-setting-import_string
+#
+# A dotted path to the backend that delivers donor alerts. The default writes
+# every message to the log and to the NotificationMessage table and transmits
+# nothing, so no real handset is ever contacted. Point this at a real provider
+# class (Termii, Twilio) to send for real; the class must implement
+# blood_requests.notifications.base.NotificationBackend.
+
+NOTIFICATION_BACKEND = 'blood_requests.notifications.ConsoleBackend'
+
+# Django only installs its default logging setup when LOGGING is undefined, so
+# naming it here would otherwise mean restating those defaults. Copying
+# DEFAULT_LOGGING keeps them exactly as they were -- the runserver request
+# lines still come from its 'django.server' logger -- and adds one entry.
+#
+# blood_requests.outbox is the logger ConsoleBackend writes to. Without an
+# entry it would propagate to the root logger, which has no handler, and
+# Python's last-resort handler discards anything below WARNING -- so the
+# OUTBOX lines, which carry each donor's reply link, would be invisible.
+LOGGING = copy.deepcopy(DEFAULT_LOGGING)
+
+LOGGING['loggers']['blood_requests.outbox'] = {
+    'handlers': ['console'],
+    'level': 'INFO',
+    'propagate': False,
 }

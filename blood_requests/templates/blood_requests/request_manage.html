@@ -1,0 +1,218 @@
+{% extends "blood_requests/base.html" %}
+
+{% block title %}Manage request &middot; BloodLink NG{% endblock %}
+
+{% block content %}
+
+<p class="breadcrumb">
+    <a href="{% url 'blood_requests:blood_request_list' %}">&larr; All requests</a>
+    &middot;
+    <a href="{% url 'blood_requests:blood_request_detail' pk=blood_request.pk %}">Public view</a>
+</p>
+
+<div class="page-head">
+    <h1>Request control panel</h1>
+    <p>
+        {{ blood_request.recipient_blood_type }} blood
+        {% if blood_request.location %}in {{ blood_request.location }}{% endif %}
+        &middot; posted {{ blood_request.created_at|date:"d M Y" }}
+    </p>
+</div>
+
+<p class="status-note status-note-neutral">
+    <strong>Keep this page's address private.</strong>
+    It contains a private key that lets anyone who has it alert donors and change
+    this request, and there is no login to protect it. Bookmark it now if you
+    will need it again.
+</p>
+
+<div class="cards">
+    <section class="card">
+        <h2>Request</h2>
+
+        <div class="row">
+            <span class="label">Blood type needed</span>
+            <span class="value">{{ blood_request.recipient_blood_type }}</span>
+        </div>
+
+        <div class="row">
+            <span class="label">Units needed</span>
+            <span class="value">{{ blood_request.units_needed }}</span>
+        </div>
+
+        <div class="row">
+            <span class="label">Urgency</span>
+            <span class="value">
+                {% include "blood_requests/_urgency.html" with urgency=blood_request.urgency %}
+            </span>
+        </div>
+
+        <div class="row">
+            <span class="label">Hospital</span>
+            <span class="value">{{ blood_request.hospital|default:"Not specified" }}</span>
+        </div>
+
+        <div class="row">
+            <span class="label">Location</span>
+            <span class="value">{{ blood_request.location|default:"Not specified" }}</span>
+        </div>
+
+        <div class="row">
+            <span class="label">Your contact</span>
+            <span class="value">
+                {{ blood_request.requester_name }}
+                &middot; {{ blood_request.requester_phone }}
+            </span>
+        </div>
+
+        <div class="row">
+            <span class="label">Status</span>
+            <span class="value">
+                {% if blood_request.is_open %}
+                    <span class="pill pill-ok">Open</span>
+                {% else %}
+                    <span class="pill pill-neutral">{{ blood_request.get_status_display }}</span>
+                {% endif %}
+            </span>
+        </div>
+    </section>
+
+    <section class="card">
+        <h2>Alert donors</h2>
+
+        <div class="row">
+            <span class="label">Compatible donor types</span>
+            <span class="value">{{ compatible_types|join:", " }}</span>
+        </div>
+
+        <div class="row">
+            <span class="label">Donors matching</span>
+            <span class="value">{{ counts.matched }}</span>
+        </div>
+
+        <div class="row">
+            <span class="label">Already alerted</span>
+            <span class="value">{{ counts.alerted }}</span>
+        </div>
+
+        <div class="row">
+            <span class="label">Said available</span>
+            <span class="value">{{ counts.available }}</span>
+        </div>
+
+        {% if not blood_request.is_open %}
+            <p class="status-note status-note-neutral">
+                This request is {{ blood_request.get_status_display|lower }}, so
+                no further donors can be alerted.
+            </p>
+        {% elif pending_count %}
+            <form method="POST"
+                  action="{% url 'blood_requests:blood_request_notify' token=blood_request.status_token %}">
+                {% csrf_token %}
+                <button type="submit" class="button button-block">
+                    Alert {{ pending_count }} matching donor{{ pending_count|pluralize }}
+                </button>
+            </form>
+
+            <p class="status-note status-note-neutral">
+                {% if pending_count > max_alerts %}
+                    Only the first {{ max_alerts }} will be alerted on each press;
+                    press again afterwards to reach the rest.
+                {% else %}
+                    Each donor receives one message with a personal link to reply.
+                    Pressing this again will not message anyone twice.
+                {% endif %}
+            </p>
+        {% else %}
+            <p class="status-note status-note-neutral">
+                Every matching donor has already been alerted for this request.
+            </p>
+        {% endif %}
+
+        <p class="status-note status-note-neutral">
+            Matching is by blood type, the 90-day wait since a donor's last
+            donation, their availability, and a text match on location. Donor
+            locations are free text and no map coordinates are held, so no
+            distance is measured or implied.
+        </p>
+    </section>
+</div>
+
+<section class="card">
+    <h2>Donor replies</h2>
+
+    {% if alerts %}
+        <div class="table-wrap">
+            <table class="data">
+                <thead>
+                    <tr>
+                        <th>Donor</th>
+                        <th>Blood type</th>
+                        <th>Location</th>
+                        <th>Phone</th>
+                        <th>Reply</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for alert in alerts %}
+                        <tr {% if alert.response == "available" %}class="is-highlighted"{% endif %}>
+                            <td>{{ alert.donor.name }}</td>
+                            <td>{{ alert.donor.blood_type }}</td>
+                            <td>{{ alert.donor.location }}</td>
+                            <td>
+                                {% if alert.donor.tel_phone %}
+                                    <a href="tel:{{ alert.donor.tel_phone }}">{{ alert.donor.phone }}</a>
+                                {% else %}
+                                    <span class="muted">Not provided</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if alert.response == "available" %}
+                                    <span class="pill pill-ok">Available</span>
+                                {% elif alert.response == "not_available" %}
+                                    <span class="pill pill-bad">Not available</span>
+                                {% elif alert.delivery_status == "failed" %}
+                                    <span class="pill pill-bad">Not delivered</span>
+                                {% else %}
+                                    <span class="pill pill-neutral">Awaiting reply</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    {% else %}
+        <p class="muted" style="margin:0;">
+            No donors have been alerted yet. Use the button above to reach the
+            donors who match this request.
+        </p>
+    {% endif %}
+</section>
+
+<section class="card">
+    <h2>Change status</h2>
+
+    <form method="POST"
+          action="{% url 'blood_requests:blood_request_status' token=blood_request.status_token %}">
+        {% csrf_token %}
+
+        <div class="actions" style="margin-top:0;">
+            <button type="submit" name="status" value="fulfilled"
+                    class="button">Mark as fulfilled</button>
+            <button type="submit" name="status" value="cancelled"
+                    class="button button-quiet">Cancel request</button>
+
+            {% if not blood_request.is_open %}
+                <button type="submit" name="status" value="open"
+                        class="button button-secondary">Reopen</button>
+            {% endif %}
+        </div>
+    </form>
+
+    <p class="status-note status-note-neutral">
+        Once a request is fulfilled or cancelled, donors can no longer reply to it.
+    </p>
+</section>
+
+{% endblock %}

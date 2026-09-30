@@ -1,0 +1,118 @@
+{% extends "blood_requests/base.html" %}
+
+{% block title %}Blood Requests &middot; BloodLink NG{% endblock %}
+
+{% block content %}
+
+<div class="page-head">
+    <h1>Blood Requests</h1>
+    <p>
+        Open requests from patients and hospitals. Post one if someone needs
+        blood, or check the alerts sent to you.
+    </p>
+</div>
+
+{% if mine %}
+    <div class="card">
+        <h2>Requests you posted</h2>
+
+        <div class="table-wrap">
+            <table class="data">
+                <thead>
+                    <tr>
+                        <th>Needed</th>
+                        <th>Location</th>
+                        <th>Status</th>
+                        <th>Posted</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in mine %}
+                        <tr>
+                            <td>
+                                <strong>{{ item.recipient_blood_type }}</strong>
+                                &middot; {{ item.units_needed }} unit{{ item.units_needed|pluralize }}
+                            </td>
+                            <td>{{ item.location|default:"&mdash;" }}</td>
+                            <td><span class="pill pill-neutral">{{ item.get_status_display }}</span></td>
+                            <td class="muted small">{{ item.created_at|date:"d M Y" }}</td>
+                            <td>
+                                <a href="{% url 'blood_requests:blood_request_manage' token=item.status_token %}">
+                                    Control panel
+                                </a>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+{% endif %}
+
+<div class="cards">
+    {% for item in requests %}
+        <div class="card">
+            <div class="request-head">
+                <div class="blood-type">{{ item.recipient_blood_type }}</div>
+                <div>
+                    <h3>{{ item.hospital|default:"A patient needs blood" }}</h3>
+                    <p class="muted small" style="margin:0;">
+                        {% include "blood_requests/_urgency.html" with urgency=item.urgency %}
+                    </p>
+                </div>
+            </div>
+
+            <div class="row">
+                <span class="label">Blood type needed</span>
+                <span class="value">{{ item.recipient_blood_type }}</span>
+            </div>
+
+            <div class="row">
+                <span class="label">Units</span>
+                <span class="value">{{ item.units_needed }}</span>
+            </div>
+
+            <div class="row">
+                <span class="label">Location</span>
+                <span class="value">{{ item.location|default:"Not specified" }}</span>
+            </div>
+
+            <div class="row">
+                <span class="label">Posted</span>
+                <span class="value">{{ item.created_at|date:"d M Y" }}</span>
+            </div>
+
+            <div class="actions">
+                <a class="button button-secondary"
+                   href="{% url 'blood_requests:blood_request_detail' pk=item.pk %}">
+                    View details
+                </a>
+            </div>
+        </div>
+    {% empty %}
+        <div class="empty">
+            <h1>No open requests</h1>
+            <p>
+                Nobody needs blood right now. When a request is posted it will
+                appear here.
+            </p>
+            <a class="button" href="{% url 'blood_requests:blood_request_create' %}">
+                Post a request
+            </a>
+        </div>
+    {% endfor %}
+</div>
+
+{% if requests %}
+    <div class="actions">
+        <a class="button" href="{% url 'blood_requests:blood_request_create' %}">
+            Post a blood request
+        </a>
+        <a class="button button-secondary" href="{% url 'blood_requests:my_alerts' %}">
+            My alerts
+        </a>
+    </div>
+{% endif %}
+
+{% endblock %}

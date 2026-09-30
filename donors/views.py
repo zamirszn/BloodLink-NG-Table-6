@@ -1,8 +1,8 @@
 from django.contrib import messages
-from django.db.models import Q
 from django.shortcuts import redirect, render
-from datetime import date, timedelta
+
 from .compatibility import compatible_donor_types
+from .eligibility import eligibility_cutoff, eligible_q, next_eligible_date
 from .forms import DonorForm, DonorSearchForm
 from .models import Donor
 
@@ -45,29 +45,27 @@ def register_donor(request):
 def donor_dashboard(request):
     donor = current_donor(request)
 
-    # This is the SAME 90-day rule the search view applies, repeated here
-    # only so the dashboard can show this donor their own status. The rule
-    # itself is unchanged: a donor who has never donated is eligible, and
-    # otherwise their last donation must be at least 90 days ago.
-    ninety_days_ago = date.today() - timedelta(days=90)
+    # The 90-day rule itself lives in donors/eligibility.py, shared with the
+    # blood-request matching so the two can never disagree. Here it only
+    # drives what this donor is told about their own status.
+    ninety_days_ago = eligibility_cutoff()
 
     is_eligible = False
-    next_eligible_date = None
+    next_date = None
 
     if donor is not None:
         if donor.last_donation is None:
             is_eligible = True
         else:
             is_eligible = donor.last_donation <= ninety_days_ago
-            # The first day the 90-day wait is over. Derived from the same
-            # cutoff above, purely for display.
-            next_eligible_date = donor.last_donation + timedelta(days=90)
+            # The first day the 90-day wait is over, purely for display.
+            next_date = next_eligible_date(donor.last_donation)
 
     return render(request, "donors/dashboard.html", {
         "donor": donor,
         "ninety_days_ago": ninety_days_ago,
         "is_eligible": is_eligible,
-        "next_eligible_date": next_eligible_date,
+        "next_eligible_date": next_date,
     })
 
 
@@ -122,12 +120,9 @@ def search_donors(request):
     # This is applied BEFORE (and independently of) the form filters.
     # Opening /search/ with no parameters leaves the form unbound, so
     # relying on form.is_valid() here would silently skip the rule.
-    ninety_days_ago = date.today() - timedelta(days=90)
+    ninety_days_ago = eligibility_cutoff()
 
-    donors = donors.filter(
-        Q(last_donation__isnull=True)
-        | Q(last_donation__lte=ninety_days_ago)
-    )
+    donors = donors.filter(eligible_q())
 
     if form.is_valid():
         blood_type = form.cleaned_data.get("blood_type")

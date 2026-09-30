@@ -1,0 +1,61 @@
+{% extends "blood_requests/base.html" %}
+
+{% block title %}Post a Blood Request &middot; BloodLink NG{% endblock %}
+
+{% block content %}
+
+<p class="breadcrumb">
+    <a href="{% url 'blood_requests:blood_request_list' %}">&larr; All requests</a>
+</p>
+
+<div class="page-head">
+    <h1>Post a Blood Request</h1>
+    <p>
+        Tell us what is needed and where. Nothing is sent to anyone yet &mdash;
+        you will see the matching donors first and decide when to alert them.
+    </p>
+</div>
+
+<div class="card">
+    <h2>Request details</h2>
+
+    {% if form.non_field_errors %}
+        <p class="status-note status-note-bad">{{ form.non_field_errors }}</p>
+    {% endif %}
+
+    <form method="POST" novalidate>
+        {% csrf_token %}
+
+        <p class="fieldset">Who needs blood</p>
+
+        <div class="field-half">
+            {% include "blood_requests/_field.html" with field=form.recipient_blood_type %}
+            {% include "blood_requests/_field.html" with field=form.units_needed %}
+        </div>
+
+        {% include "blood_requests/_field.html" with field=form.urgency %}
+
+        <p class="fieldset">Where</p>
+
+        {% include "blood_requests/_field.html" with field=form.hospital %}
+        {% include "blood_requests/_field.html" with field=form.location %}
+
+        <p class="fieldset">Your contact details</p>
+
+        {% include "blood_requests/_field.html" with field=form.requester_name %}
+
+        <div class="field-half">
+            {% include "blood_requests/_field.html" with field=form.requester_phone %}
+        </div>
+
+        {% include "blood_requests/_field.html" with field=form.notes %}
+
+        <div class="actions">
+            <button type="submit" class="button">Post request</button>
+            <a class="button button-quiet"
+               href="{% url 'blood_requests:blood_request_list' %}">Cancel</a>
+        </div>
+    </form>
+</div>
+
+{% endblock %}

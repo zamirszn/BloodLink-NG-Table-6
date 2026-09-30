@@ -1,0 +1,18 @@
+{% comment %}
+One form field: label, optional help text, the widget, and its errors. Kept
+in a partial so the request form can group fields freely without repeating
+this markup. Expects `field` in context.
+{% endcomment %}
+<div class="field {% if field.errors %}has-error{% endif %}">
+    <label for="{{ field.id_for_label }}">
+        {{ field.label }}{% if field.field.required %} <span class="req" aria-hidden="true">*</span>{% endif %}
+    </label>
+
+    {% if field.help_text %}
+        <p class="help">{{ field.help_text }}</p>
+    {% endif %}
+
+    {{ field }}
+
+    {{ field.errors }}
+</div>

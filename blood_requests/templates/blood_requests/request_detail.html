@@ -1,0 +1,164 @@
+{% extends "blood_requests/base.html" %}
+
+{% block title %}{{ blood_request.recipient_blood_type }} request &middot; BloodLink NG{% endblock %}
+
+{% block content %}
+
+<p class="breadcrumb">
+    <a href="{% url 'blood_requests:blood_request_list' %}">&larr; All requests</a>
+</p>
+
+<div class="page-head">
+    <h1>
+        {{ blood_request.recipient_blood_type }} blood needed
+        {% if blood_request.location %}in {{ blood_request.location }}{% endif %}
+    </h1>
+    <p>Posted {{ blood_request.created_at|date:"d M Y" }}.</p>
+</div>
+
+<div class="cards">
+    <section class="card">
+        <h2>Request</h2>
+
+        <div class="request-head">
+            <div class="blood-type">{{ blood_request.recipient_blood_type }}</div>
+            <div>
+                <h3>{{ blood_request.hospital|default:"A patient" }}</h3>
+                <p style="margin:0;">
+                    {% include "blood_requests/_urgency.html" with urgency=blood_request.urgency %}
+                </p>
+            </div>
+        </div>
+
+        <div class="row">
+            <span class="label">Blood type needed</span>
+            <span class="value">{{ blood_request.recipient_blood_type }}</span>
+        </div>
+
+        <div class="row">
+            <span class="label">Units needed</span>
+            <span class="value">{{ blood_request.units_needed }}</span>
+        </div>
+
+        <div class="row">
+            <span class="label">Hospital</span>
+            <span class="value">{{ blood_request.hospital|default:"Not specified" }}</span>
+        </div>
+
+        <div class="row">
+            <span class="label">Location</span>
+            <span class="value">{{ blood_request.location|default:"Not specified" }}</span>
+        </div>
+
+        <div class="row">
+            <span class="label">Status</span>
+            <span class="value">
+                {% if blood_request.is_open %}
+                    <span class="pill pill-ok">Open</span>
+                {% else %}
+                    <span class="pill pill-neutral">{{ blood_request.get_status_display }}</span>
+                {% endif %}
+            </span>
+        </div>
+
+        {% if blood_request.notes %}
+            <p class="status-note status-note-neutral">{{ blood_request.notes }}</p>
+        {% endif %}
+    </section>
+
+    <section class="card">
+        <h2>Matching donors</h2>
+
+        <div class="row">
+            <span class="label">Compatible donor types</span>
+            <span class="value">{{ compatible_types|join:", " }}</span>
+        </div>
+
+        <div class="row">
+            <span class="label">Donors matching</span>
+            <span class="value">{{ counts.matched }}</span>
+        </div>
+
+        <div class="row">
+            <span class="label">Alerted so far</span>
+            <span class="value">{{ counts.alerted }}</span>
+        </div>
+
+        <div class="row">
+            <span class="label">Replied</span>
+            <span class="value">{{ counts.responded }}</span>
+        </div>
+
+        <div class="row">
+            <span class="label">Said available</span>
+            <span class="value">{{ counts.available }}</span>
+        </div>
+
+        <p class="status-note status-note-neutral">
+            A donor is counted here when their blood type is compatible, they
+            have passed the 90-day wait since their last donation, they are
+            marked available, and &mdash; when a location is given &mdash; their
+            recorded location contains that text.
+            Donor locations are free text and this project holds no map
+            coordinates, so no distance is measured or implied.
+        </p>
+    </section>
+</div>
+
+<section class="card">
+    <h2>Donors alerted</h2>
+
+    {% if alerts %}
+        <div class="table-wrap">
+            <table class="data">
+                <thead>
+                    <tr>
+                        <th>Donor</th>
+                        <th>Blood type</th>
+                        <th>Location</th>
+                        <th>Alert</th>
+                        <th>Reply</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for alert in alerts %}
+                        <tr {% if alert.response == "available" %}class="is-highlighted"{% endif %}>
+                            <td>{{ alert.donor.name }}</td>
+                            <td>{{ alert.donor.blood_type }}</td>
+                            <td>{{ alert.donor.location }}</td>
+                            <td>
+                                {% if alert.delivery_status == "sent" %}
+                                    <span class="pill pill-ok">Sent</span>
+                                {% elif alert.delivery_status == "failed" %}
+                                    <span class="pill pill-bad">Failed</span>
+                                {% else %}
+                                    <span class="pill pill-neutral">Pending</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if alert.response == "available" %}
+                                    <span class="pill pill-ok">Available</span>
+                                {% elif alert.response == "not_available" %}
+                                    <span class="pill pill-bad">Not available</span>
+                                {% else %}
+                                    <span class="pill pill-neutral">Awaiting reply</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <p class="status-note status-note-neutral">
+            Contact details are not shown here. They are visible only to the
+            person who posted this request, on their private control panel.
+        </p>
+    {% else %}
+        <p class="muted" style="margin:0;">
+            No donors have been alerted for this request yet.
+        </p>
+    {% endif %}
+</section>
+
+{% endblock %}

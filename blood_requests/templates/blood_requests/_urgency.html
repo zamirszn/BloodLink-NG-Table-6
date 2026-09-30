@@ -1,0 +1,2 @@
+{% comment %}Urgency pill. Expects `urgency` in context.{% endcomment %}
+{% if urgency == "critical" %}<span class="pill pill-bad">Critical</span>{% elif urgency == "urgent" %}<span class="pill pill-warn">Urgent</span>{% else %}<span class="pill pill-neutral">Routine</span>{% endif %}
