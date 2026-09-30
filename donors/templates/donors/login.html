@@ -1,0 +1,34 @@
+{% extends "donors/base.html" %}
+{% block title %}Log in — BloodLink NG{% endblock %}
+{% block content %}
+<main class="auth-wrap">
+  <div class="card auth-card">
+    <div class="eyebrow">Welcome back</div>
+    <h1>Log in</h1>
+    <p class="lead">Use the phone number and password you registered with.</p>
+    <form method="post" novalidate>
+      {% csrf_token %}
+      <input type="hidden" name="next" value="{{ next }}">
+      {% for error in form.non_field_errors %}<p class="form-error" role="alert">{{ error }}</p>{% endfor %}
+      {% include "donors/_field.html" with field=form.phone %}
+      <div class="field{% if form.password.errors %} has-error{% endif %}">
+        <label for="{{ form.password.id_for_label }}">{{ form.password.label }}</label>
+        <div class="password-row">{{ form.password }}<button type="button" class="toggle-password" data-target="{{ form.password.id_for_label }}">Show</button></div>
+        {% for error in form.password.errors %}<p class="error">{{ error }}</p>{% endfor %}
+      </div>
+      <button class="btn btn-block" type="submit">Log in</button>
+    </form>
+    <p class="auth-alt">New here? <a href="{% url 'register_donor' %}">Become a donor</a></p>
+  </div>
+</main>
+<script>
+document.querySelectorAll(".toggle-password").forEach(function(button) {
+  button.addEventListener("click", function() {
+    const input = document.getElementById(button.dataset.target);
+    const hidden = input.type === "password";
+    input.type = hidden ? "text" : "password";
+    button.textContent = hidden ? "Hide" : "Show";
+  });
+});
+</script>
+{% endblock %}

@@ -1,47 +1,112 @@
-from django.contrib import messages
-from django.db.models import Q
-from django.shortcuts import redirect, render
 from datetime import date, timedelta
-from .compatibility import compatible_donor_types
-from .forms import DonorForm, DonorSearchForm
+
+from django.contrib import messages
+from django.contrib.auth import login, logout
+from django.contrib.auth.decorators import login_required
+from django.db.models import Case, IntegerField, Q, Value, When
+from django.shortcuts import redirect, render
+from django.utils.http import url_has_allowed_host_and_scheme
+from django.views.decorators.http import require_POST
+
+from .compatibility import ALL_BLOOD_TYPES, COMPATIBILITY, compatible_donor_types
+from .forms import DonorForm, DonorSearchForm, LoginForm, RegisterForm
 from .models import Donor
 
 
+# Donor blood type -> recipient types that can receive it. This is the
+# COMPATIBILITY table read the other way round; it feeds the "who can you
+# help" panel on the registration page.
+RECIPIENTS_BY_DONOR_TYPE = {
+    donor_type: [
+        recipient_type
+        for recipient_type in ALL_BLOOD_TYPES
+        if donor_type in COMPATIBILITY[recipient_type]
+    ]
+    for donor_type in ALL_BLOOD_TYPES
+}
+
+
+def home(request):
+    """Public landing page for BloodLink NG."""
+    return render(request, "donors/home.html")
+
+
 def current_donor(request):
-    """The donor this browser session belongs to, or None.
+    """The donor profile of the logged-in user, or None.
 
-    There is no authentication here: the donor ID written to the session at
-    registration is what identifies the current donor. Every view that needs
-    "my donor" goes through this one lookup so the rule stays in one place.
+    None also covers a logged-in account with no donor profile (for
+    example an admin user), so callers must handle it.
     """
-    donor_id = request.session.get("donor_id")
-
-    if donor_id is None:
+    if not request.user.is_authenticated:
         return None
 
-    return Donor.objects.filter(pk=donor_id).first()
+    return Donor.objects.filter(user=request.user).first()
 
 
 def register_donor(request):
+    if current_donor(request) is not None:
+        return redirect("donor_dashboard")
+
     if request.method == "POST":
-        form = DonorForm(request.POST)
+        form = RegisterForm(request.POST)
 
         if form.is_valid():
             donor = form.save()
 
-            # Remember which donor just registered so /dashboard/ can show them.
-            request.session["donor_id"] = donor.pk
+            # Registering also signs the donor in.
+            login(request, donor.user)
 
             return redirect("donor_dashboard")
 
     else:
-        form = DonorForm()
+        form = RegisterForm()
 
     return render(request, "donors/register.html", {
-        "form": form
+        "form": form,
+        "recipients_by_donor_type": RECIPIENTS_BY_DONOR_TYPE,
     })
 
 
+def login_view(request):
+    if request.user.is_authenticated:
+        return redirect("donor_dashboard")
+
+    next_url = request.POST.get("next") or request.GET.get("next", "")
+
+    if request.method == "POST":
+        form = LoginForm(request.POST, request=request)
+
+        if form.is_valid():
+            login(request, form.user)
+
+            # Only follow a "next" address that stays on this site.
+            is_safe = url_has_allowed_host_and_scheme(
+                next_url,
+                allowed_hosts={request.get_host()},
+                require_https=request.is_secure(),
+            )
+
+            return redirect(next_url if is_safe else "donor_dashboard")
+
+    else:
+        form = LoginForm(request=request)
+
+    return render(request, "donors/login.html", {
+        "form": form,
+        "next": next_url,
+    })
+
+
+@require_POST
+def logout_view(request):
+    logout(request)
+
+    messages.info(request, "You have been logged out.")
+
+    return redirect("login")
+
+
+@login_required(login_url="login")
 def donor_dashboard(request):
     donor = current_donor(request)
 
@@ -71,13 +136,12 @@ def donor_dashboard(request):
     })
 
 
+@login_required(login_url="login")
 def edit_donor(request):
     donor = current_donor(request)
 
-    # No donor in this session, or the record is gone: this session has
-    # nothing it is allowed to edit. Never fall back to some other donor's
-    # record — the dashboard already explains the situation and offers
-    # registration, so send them there.
+    # A logged-in account with no donor profile has nothing to edit. Never
+    # fall back to some other donor's record; the dashboard explains it.
     if donor is None:
         return redirect("donor_dashboard")
 
@@ -106,6 +170,9 @@ def edit_donor(request):
     })
 
 
+# Donor phone numbers are shown here, so only logged-in users can search.
+# To open the search to everyone, remove the decorator below.
+@login_required(login_url="login")
 def search_donors(request):
     form = DonorSearchForm(request.GET or None)
 
@@ -128,6 +195,12 @@ def search_donors(request):
         Q(last_donation__isnull=True)
         | Q(last_donation__lte=ninety_days_ago)
     )
+
+    # The person searching is not a match for themselves.
+    me = current_donor(request)
+
+    if me is not None:
+        donors = donors.exclude(pk=me.pk)
 
     if form.is_valid():
         blood_type = form.cleaned_data.get("blood_type")
@@ -162,11 +235,30 @@ def search_donors(request):
                 availability=is_available
             )
 
+    # Best matches first: available donors, then donors with exactly the
+    # recipient's blood type, then alphabetical.
+    if recipient_type:
+        donors = donors.annotate(
+            type_rank=Case(
+                When(blood_type=recipient_type, then=Value(0)),
+                default=Value(1),
+                output_field=IntegerField(),
+            )
+        ).order_by("-availability", "type_rank", "name")
+    else:
+        donors = donors.order_by("-availability", "name")
+
+    donors = list(donors)
+
+    for donor in donors:
+        donor.wa_url = donor.whatsapp_url(recipient_type)
+
     return render(request, "donors/search.html", {
         "form": form,
         "donors": donors,
         "recipient_type": recipient_type,
         "compatible_types": compatible_donor_types(recipient_type),
+        "searched": bool(request.GET),
         # Exposed so each result card can show the 90-day eligibility
         # status using the same cutoff that filtered the queryset above.
         "ninety_days_ago": ninety_days_ago,

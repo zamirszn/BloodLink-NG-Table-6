@@ -1,470 +1,52 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>BloodLink NG - Donor Dashboard</title>
-
-    <style>
-        * {
-            box-sizing: border-box;
-        }
-
-        body {
-            font-family: Arial, Helvetica, sans-serif;
-            background-color: #f5f5f5;
-            color: #222;
-            margin: 0;
-            padding: 0;
-            line-height: 1.5;
-        }
-
-        /* ---------- Top navigation ---------- */
-
-        .topbar {
-            background-color: #b30000;
-            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.18);
-        }
-
-        .topbar-inner {
-            max-width: 1000px;
-            margin: 0 auto;
-            padding: 14px 20px;
-            display: flex;
-            flex-wrap: wrap;
-            align-items: center;
-            justify-content: space-between;
-            gap: 10px;
-        }
-
-        .brand {
-            color: #ffffff;
-            font-size: 20px;
-            font-weight: bold;
-            text-decoration: none;
-        }
-
-        .nav-links {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 8px;
-        }
-
-        .nav-links a {
-            color: #ffffff;
-            text-decoration: none;
-            font-size: 15px;
-            padding: 8px 14px;
-            border-radius: 6px;
-            background-color: rgba(255, 255, 255, 0.14);
-        }
-
-        .nav-links a:hover {
-            background-color: rgba(255, 255, 255, 0.3);
-        }
-
-        .nav-links a.active {
-            background-color: #ffffff;
-            color: #b30000;
-            font-weight: bold;
-        }
-
-        /* ---------- Page layout ---------- */
-
-        .page {
-            max-width: 1000px;
-            margin: 0 auto;
-            padding: 28px 20px 60px;
-        }
-
-        .welcome {
-            margin-bottom: 24px;
-        }
-
-        .welcome h1 {
-            margin: 0 0 6px;
-            font-size: 28px;
-            color: #111;
-        }
-
-        .welcome p {
-            margin: 0;
-            color: #666;
-        }
-
-        /* Two columns on wide screens, one column on narrow screens. */
-        .cards {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-            gap: 20px;
-        }
-
-        .card {
-            background: #ffffff;
-            border-radius: 12px;
-            padding: 24px;
-            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
-        }
-
-        .card h2 {
-            margin: 0 0 18px;
-            padding-bottom: 12px;
-            border-bottom: 1px solid #eee;
-            font-size: 17px;
-            color: #b30000;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
-
-        /* ---------- Profile card ---------- */
-
-        .profile-head {
-            display: flex;
-            align-items: center;
-            gap: 16px;
-            margin-bottom: 18px;
-        }
-
-        .avatar {
-            flex: 0 0 auto;
-            width: 56px;
-            height: 56px;
-            border-radius: 50%;
-            background-color: #b30000;
-            color: #ffffff;
-            font-size: 24px;
-            font-weight: bold;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-
-        .profile-head .profile-name {
-            margin: 0;
-            font-size: 20px;
-            font-weight: bold;
-        }
-
-        .profile-head .profile-sub {
-            margin: 2px 0 0;
-            color: #666;
-            font-size: 14px;
-        }
-
-        .row {
-            display: flex;
-            flex-wrap: wrap;
-            justify-content: space-between;
-            gap: 4px 16px;
-            padding: 11px 0;
-            border-bottom: 1px solid #f0f0f0;
-        }
-
-        .row:last-child {
-            border-bottom: none;
-        }
-
-        .row .label {
-            color: #666;
-        }
-
-        .row .value {
-            font-weight: bold;
-            text-align: right;
-            word-break: break-word;
-        }
-
-        /* ---------- Status card ---------- */
-
-        .pill {
-            display: inline-block;
-            padding: 4px 12px;
-            border-radius: 999px;
-            font-size: 14px;
-            font-weight: bold;
-        }
-
-        .pill-ok {
-            background-color: #e6f4ea;
-            color: #1a7f37;
-        }
-
-        .pill-bad {
-            background-color: #fdecea;
-            color: #b42318;
-        }
-
-        .status-note {
-            margin: 16px 0 0;
-            padding: 12px 14px;
-            border-radius: 8px;
-            font-size: 14px;
-        }
-
-        .status-note-ok {
-            background-color: #f2faf4;
-            color: #1a7f37;
-            border-left: 4px solid #1a7f37;
-        }
-
-        .status-note-bad {
-            background-color: #fef6f5;
-            color: #b42318;
-            border-left: 4px solid #b42318;
-        }
-
-        .status-note-neutral {
-            background-color: #f5f7fa;
-            color: #555;
-            border-left: 4px solid #bbb;
-        }
-
-        /* ---------- Action buttons ---------- */
-
-        .actions {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 12px;
-            margin-top: 24px;
-        }
-
-        .button {
-            flex: 1 1 220px;
-            padding: 14px 20px;
-            border-radius: 8px;
-            font-size: 16px;
-            text-align: center;
-            text-decoration: none;
-            border: 2px solid #b30000;
-            background-color: #b30000;
-            color: #ffffff;
-            cursor: pointer;
-        }
-
-        .button:hover {
-            background-color: #8f0000;
-            border-color: #8f0000;
-        }
-
-        .button-secondary {
-            background-color: #ffffff;
-            color: #b30000;
-        }
-
-        .button-secondary:hover {
-            background-color: #fdecea;
-            color: #8f0000;
-            border-color: #8f0000;
-        }
-
-        /* ---------- Flash message ---------- */
-
-        .flash {
-            margin: 0 0 20px;
-            padding: 14px 16px;
-            border-radius: 8px;
-            background-color: #e6f4ea;
-            color: #1a7f37;
-            border-left: 4px solid #1a7f37;
-            font-weight: bold;
-        }
-
-        /* ---------- Empty state ---------- */
-
-        .empty {
-            background: #ffffff;
-            border-radius: 12px;
-            padding: 36px 24px;
-            text-align: center;
-            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
-        }
-
-        .empty p {
-            margin: 0 0 22px;
-            color: #666;
-        }
-
-        .empty .button {
-            display: inline-block;
-            flex: 0 0 auto;
-        }
-    </style>
-</head>
-
-<body>
-
-<header class="topbar">
-    <div class="topbar-inner">
-        <a class="brand" href="{% url 'donor_dashboard' %}">🩸 BloodLink NG</a>
-
-        {% comment %}
-        The dashboard's actions are the buttons below the cards. Keep this
-        nav to just the current page so those links are not repeated.
-        {% endcomment %}
-        <nav class="nav-links">
-            <a class="active" href="{% url 'donor_dashboard' %}">Dashboard</a>
-        </nav>
-    </div>
-</header>
-
+{% extends "donors/base.html" %}
+{% block title %}Dashboard — BloodLink NG{% endblock %}
+{% block content %}
 <main class="page">
-
-    {% if messages %}
-        {% for message in messages %}
-            <p class="flash">{{ message }}</p>
-        {% endfor %}
-    {% endif %}
-
-    {% if donor %}
-
-        <div class="welcome">
-            <h1>Welcome, {{ donor.name }} 👋</h1>
-            <p>Here is your donor profile and current donation status.</p>
-        </div>
-
-        <div class="cards">
-
-            {# ---------- Donor profile ---------- #}
-            <section class="card">
-                <h2>Donor Profile</h2>
-
-                <div class="profile-head">
-                    <div class="avatar">{{ donor.name|slice:":1"|upper }}</div>
-                    <div>
-                        <p class="profile-name">{{ donor.name }}</p>
-                        <p class="profile-sub">
-                            Blood type {{ donor.blood_type }}
-                            &middot; Genotype {{ donor.genotype }}
-                        </p>
-                    </div>
-                </div>
-
-                <div class="row">
-                    <span class="label">Name</span>
-                    <span class="value">{{ donor.name }}</span>
-                </div>
-
-                <div class="row">
-                    <span class="label">Blood Type</span>
-                    <span class="value">{{ donor.blood_type }}</span>
-                </div>
-
-                <div class="row">
-                    <span class="label">Genotype</span>
-                    <span class="value">{{ donor.genotype }}</span>
-                </div>
-
-                <div class="row">
-                    <span class="label">Location</span>
-                    <span class="value">{{ donor.location }}</span>
-                </div>
-
-                <div class="row">
-                    <span class="label">Phone Number</span>
-                    <span class="value">
-                        {{ donor.phone|default:"Not provided" }}
-                    </span>
-                </div>
-            </section>
-
-            {# ---------- Donation status ---------- #}
-            <section class="card">
-                <h2>Donation Status</h2>
-
-                <div class="row">
-                    <span class="label">Availability</span>
-                    <span class="value">
-                        {% if donor.availability %}
-                            <span class="pill pill-ok">Available</span>
-                        {% else %}
-                            <span class="pill pill-bad">Not available</span>
-                        {% endif %}
-                    </span>
-                </div>
-
-                <div class="row">
-                    <span class="label">Last Donation</span>
-                    <span class="value">
-                        {% if donor.last_donation %}
-                            {{ donor.last_donation|date:"d M Y" }}
-                        {% else %}
-                            No previous donation
-                        {% endif %}
-                    </span>
-                </div>
-
-                <div class="row">
-                    <span class="label">90-Day Eligibility</span>
-                    <span class="value">
-                        {% if is_eligible %}
-                            <span class="pill pill-ok">Eligible to donate</span>
-                        {% else %}
-                            <span class="pill pill-bad">Not yet eligible</span>
-                        {% endif %}
-                    </span>
-                </div>
-
-                {% if is_eligible %}
-                    {% if donor.last_donation %}
-                        <p class="status-note status-note-ok">
-                            Your last donation was more than 90 days ago, so you
-                            can donate again now.
-                        </p>
-                    {% else %}
-                        <p class="status-note status-note-ok">
-                            You have no previous donation on record, so you can
-                            donate now.
-                        </p>
-                    {% endif %}
-                {% else %}
-                    <p class="status-note status-note-bad">
-                        You donated less than 90 days ago. You can donate again
-                        from {{ next_eligible_date|date:"d M Y" }}.
-                    </p>
-                {% endif %}
-
-                {% if not donor.availability %}
-                    <p class="status-note status-note-neutral">
-                        You are currently marked as not available, so you will
-                        not appear in donor search results.
-                    </p>
-                {% endif %}
-            </section>
-
-        </div>
-
-        <div class="actions">
-            <a class="button" href="{% url 'search_donors' %}">
-                Find a Donor
-            </a>
-
-            <a class="button button-secondary" href="{% url 'edit_donor' %}">
-                Edit Profile
-            </a>
-
-            <a class="button button-secondary" href="{% url 'register_donor' %}">
-                Register Another Donor
-            </a>
-        </div>
-
-    {% else %}
-
-        <div class="empty">
-            <h1>🩸 BloodLink NG</h1>
-
-            <p>
-                No donor has been registered in this browser session yet.
-                Register as a donor to see your dashboard.
-            </p>
-
-            <a class="button" href="{% url 'register_donor' %}">
-                Register as a Donor
-            </a>
-        </div>
-
-    {% endif %}
-
+<div class="container">
+{% if donor %}
+  <div class="dashboard-head">
+    <div class="page-head" style="margin-bottom:0">
+      <div class="eyebrow">Donor dashboard</div>
+      <h1>Welcome, {{ donor.name }}</h1>
+      <p>Review your donor details and current eligibility.</p>
+    </div>
+    <a class="btn" href="{% url 'search_donors' %}">Find a donor</a>
+  </div>
+  <div class="profile-card">
+    <section class="card">
+      <div class="profile-top">
+        <div class="avatar">{{ donor.name|slice:":1"|upper }}</div>
+        <div><h2 style="font-size:21px">{{ donor.name }}</h2><p class="muted" style="font-size:12px">Donor profile</p></div>
+      </div>
+      <dl class="detail-list">
+        <div class="detail-row"><dt>Blood type</dt><dd>{{ donor.blood_type }}</dd></div>
+        <div class="detail-row"><dt>Genotype</dt><dd>{{ donor.genotype }}</dd></div>
+        <div class="detail-row"><dt>Location</dt><dd>{{ donor.location }}</dd></div>
+        <div class="detail-row"><dt>Phone</dt><dd>{{ donor.phone|default:"Not provided" }}</dd></div>
+      </dl>
+    </section>
+    <section class="card">
+      <div class="status-box">
+        <h3>Donation status</h3>
+        <div class="detail-row"><dt>Availability</dt><dd>{% if donor.availability %}<span class="pill pill-ok">Available</span>{% else %}<span class="pill pill-off">Not available</span>{% endif %}</dd></div>
+        <div class="detail-row"><dt>Last donation</dt><dd>{% if donor.last_donation %}{{ donor.last_donation|date:"d M Y" }}{% else %}Never{% endif %}</dd></div>
+        <div class="detail-row"><dt>Eligibility</dt><dd>{% if is_eligible %}<span class="pill pill-ok">Eligible</span>{% else %}<span class="pill pill-off">Not yet eligible</span>{% endif %}</dd></div>
+        {% if is_eligible %}
+          <p class="status-note status-note-ok">{% if donor.last_donation %}You have passed the 90-day waiting period and can donate again.{% else %}You have no previous donation on record and can donate now.{% endif %}</p>
+        {% else %}
+          <p class="status-note status-note-bad">You can donate again from {{ next_eligible_date|date:"d M Y" }}.</p>
+        {% endif %}
+        {% if not donor.availability %}<p class="status-note status-note-neutral">You are currently unavailable and won't appear in donor search results.</p>{% endif %}
+      </div>
+    </section>
+  </div>
+  <div class="actions">
+    <a class="btn btn-ghost" href="{% url 'edit_donor' %}">Edit profile</a>
+    <a class="btn btn-ghost" href="{% url 'search_donors' %}">Search donors</a>
+  </div>
+{% else %}
+  <div class="card empty-state"><div class="drop">♥</div><h1>No donor profile yet</h1><p class="muted" style="margin:10px auto 22px;max-width:500px">Create a donor profile to start using BloodLink NG.</p><a class="btn" href="{% url 'register_donor' %}">Become a donor</a></div>
+{% endif %}
+</div>
 </main>
-
-</body>
-</html>
+{% endblock %}

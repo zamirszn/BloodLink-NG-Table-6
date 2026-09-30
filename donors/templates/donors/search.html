@@ -1,160 +1,54 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="utf-8">
-    <title>Search Blood Donors</title>
-
-    <style>
-        .back-nav {
-            margin: 0 0 12px;
-        }
-        .back-nav a {
-            display: inline-block;
-            padding: 8px 14px;
-            background-color: #b30000;
-            color: #ffffff;
-            border-radius: 6px;
-            font-size: 14px;
-            text-decoration: none;
-        }
-        .back-nav a:hover {
-            background-color: #8f0000;
-        }
-        .donor-card {
-            border: 1px solid #ccc;
-            border-radius: 8px;
-            padding: 16px;
-            margin-bottom: 16px;
-        }
-        .donor-card h3 {
-            margin-top: 0;
-        }
-        .donor-details,
-        .donor-status {
-            line-height: 1.7;
-            margin-bottom: 12px;
-        }
-        .status-ok {
-            color: #1a7f37;
-            font-weight: bold;
-        }
-        .status-bad {
-            color: #b42318;
-            font-weight: bold;
-        }
-        .contact-donor {
-            display: inline-block;
-            padding: 12px 20px;
-            background-color: #b30000;
-            color: white;
-            border: none;
-            border-radius: 6px;
-            font-size: 16px;
-            cursor: pointer;
-            text-decoration: none;
-        }
-        .contact-donor:hover {
-            background-color: #8f0000;
-        }
-        .contact-donor:disabled {
-            background-color: #999;
-            cursor: not-allowed;
-        }
-        .donor-note {
-            margin: 8px 0 0;
-            color: #666;
-            font-size: 14px;
-        }
-    </style>
-</head>
-
-<body>
-
-    <p class="back-nav">
-        <a href="{% url 'donor_dashboard' %}">&larr; Back to Dashboard</a>
-    </p>
-
-    <h1>Find a Blood Donor</h1>
-
-    <form method="GET" action="">
-        {{ form.as_p }}
-
-        <button type="submit">Search</button>
-    </form>
-
-    <hr>
-
-    <h2>Available Donors</h2>
-
-    {% if recipient_type %}
-        <p>
-            Showing only donors who can donate to a
-            <strong>{{ recipient_type }}</strong> recipient.
-            Compatible donor blood types are:
-            {{ compatible_types|join:", " }}.
-        </p>
-    {% else %}
-        <p>
-            No recipient blood type selected, so every eligible donor is
-            listed regardless of blood type. These donors are not shown as
-            compatible with a specific recipient &mdash; choose a recipient
-            blood type above to check compatibility.
-        </p>
-    {% endif %}
-
-    {% if donors %}
-        <p>{{ donors|length }} eligible donor{{ donors|length|pluralize }} found.</p>
-    {% endif %}
-
-    {% for donor in donors %}
-        <div class="donor-card">
-            <h3>{{ donor.name }}</h3>
-
-            <p class="donor-details">
-                <strong>Blood Type:</strong> {{ donor.blood_type }}<br>
-                <strong>Genotype:</strong> {{ donor.genotype }}<br>
-                <strong>Location:</strong> {{ donor.location }}<br>
-                <strong>Phone:</strong> {{ donor.phone }}<br>
-                <strong>Available:</strong> {{ donor.availability|yesno:"Yes,No" }}<br>
-                <strong>Last Donation:</strong> {{ donor.last_donation|default:"Never donated" }}
-            </p>
-
-            <p class="donor-status">
-                {% if recipient_type %}
-                    <strong>Compatible with recipient:</strong> {{ recipient_type }}
-                    &mdash; <span class="status-ok">Yes</span><br>
-                {% else %}
-                    <strong>Compatibility:</strong>
-                    Not checked &mdash; no recipient blood type selected<br>
-                {% endif %}
-
-                <strong>90-Day Eligibility:</strong>
-                {% if donor.last_donation and donor.last_donation > ninety_days_ago %}
-                    <span class="status-bad">Not passed</span>
-                {% else %}
-                    <span class="status-ok">Passed</span>
-                {% endif %}
-            </p>
-
-            {# Contact the donor by phone. tel_phone strips formatting so the
-               value is safe inside the attribute; Django still escapes it on
-               output. Donors with no usable number get a disabled button
-               rather than a broken tel: link. #}
-            {% if donor.tel_phone %}
-                <a class="contact-donor" href="tel:{{ donor.tel_phone }}">Contact Donor</a>
-            {% else %}
-                <button type="button" class="contact-donor" disabled
-                        title="This donor has no phone number on file.">Contact Donor</button>
-                <p class="donor-note">No phone number on file.</p>
-            {% endif %}
-        </div>
-    {% empty %}
-        <p>
-            No eligible donors matched your search.
-            Donors who donated within the last 90 days are not shown.
-            Try a different recipient blood type, location, or availability.
-        </p>
-    {% endfor %}
-
-</body>
-</html>
+{% extends "donors/base.html" %}
+{% block title %}Find a donor — BloodLink NG{% endblock %}
+{% block content %}
+<main class="page">
+<div class="container">
+  <div class="page-head">
+    <div class="eyebrow">Donor directory</div>
+    <h1>Find a blood donor</h1>
+    <p>Search eligible donors by the recipient's blood type, location and availability.</p>
+  </div>
+  <div class="search-layout">
+    <aside class="card search-filters">
+      <h2 style="font-size:20px;margin-bottom:20px">Search filters</h2>
+      <form method="GET">
+        {% include "donors/choice_group.html" with field=form.blood_type %}
+        {% include "donors/_field.html" with field=form.location %}
+        <div class="field">{{ form.availability.label_tag }}{{ form.availability }}</div>
+        <button class="btn btn-block" type="submit">Search donors</button>
+      </form>
+    </aside>
+    <section>
+      <div class="results-head">
+        <div><h2>Available donors</h2><p>{% if donors %}{{ donors|length }} eligible donor{{ donors|length|pluralize }} found.{% else %}No matching donors found.{% endif %}</p></div>
+        {% if recipient_type %}<span class="pill pill-ok">Recipient: {{ recipient_type }}</span>{% endif %}
+      </div>
+      {% if recipient_type %}
+      <div class="card" style="margin-bottom:14px;padding:15px 18px;font-size:12px;color:var(--muted)">Showing donors compatible with <strong style="color:var(--ink)">{{ recipient_type }}</strong>. Compatible donor types: {{ compatible_types|join:", " }}.</div>
+      {% endif %}
+      <div class="donor-list">
+      {% for donor in donors %}
+        <article class="card donor-card">
+          <div class="donor-card-head">
+            <div><h3 class="donor-name">{{ donor.name }}</h3><div class="donor-meta"><span>{{ donor.location }}</span><span>Genotype {{ donor.genotype }}</span></div></div>
+            <div class="blood-badge">{{ donor.blood_type }}</div>
+          </div>
+          <div class="donor-status">
+            {% if recipient_type %}<span class="pill pill-ok">Compatible with {{ recipient_type }}</span>{% endif %}
+            <span class="pill pill-ok">90-day eligible</span>
+            {% if donor.availability %}<span class="pill pill-ok">Available</span>{% else %}<span class="pill pill-off">Not available</span>{% endif %}
+          </div>
+          <div class="donor-actions">
+            {% if donor.tel_phone %}<a class="btn btn-sm" href="tel:{{ donor.tel_phone }}">Call donor</a>{% endif %}
+            {% if donor.wa_url %}<a class="btn btn-sm btn-ghost" href="{{ donor.wa_url }}" target="_blank" rel="noopener">WhatsApp</a>{% endif %}
+          </div>
+        </article>
+      {% empty %}
+        <div class="card empty-state"><div class="drop">⌕</div><h3>No donors matched</h3><p class="muted" style="margin:8px auto 18px;max-width:500px">Try another blood type, location or availability filter.</p><a class="btn btn-ghost" href="{% url 'search_donors' %}">Clear filters</a></div>
+      {% endfor %}
+      </div>
+    </section>
+  </div>
+</div>
+</main>
+{% endblock %}

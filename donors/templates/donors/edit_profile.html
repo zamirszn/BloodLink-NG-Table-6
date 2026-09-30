@@ -1,162 +1,41 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <title>BloodLink NG - Edit Profile</title>
-
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            background-color: #f5f5f5;
-            margin: 0;
-            padding: 40px;
-        }
-
-        .container {
-            max-width: 500px;
-            margin: auto;
-            background: white;
-            padding: 30px;
-            border-radius: 12px;
-            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
-        }
-
-        h1 {
-            text-align: center;
-            color: #b30000;
-            margin-bottom: 10px;
-        }
-
-        .subtitle {
-            text-align: center;
-            color: #666;
-            margin-bottom: 25px;
-        }
-
-        label {
-            font-weight: bold;
-            display: block;
-            margin-bottom: 6px;
-        }
-
-        input, select {
-            width: 100%;
-            padding: 10px;
-            margin-bottom: 18px;
-            border: 1px solid #ccc;
-            border-radius: 6px;
-            box-sizing: border-box;
-        }
-
-        button {
-            width: 100%;
-            padding: 12px;
-            background-color: #b30000;
-            color: white;
-            border: none;
-            border-radius: 6px;
-            font-size: 16px;
-            cursor: pointer;
-        }
-
-        button:hover {
-            background-color: #8f0000;
-        }
-
-        .cancel {
-            display: block;
-            text-align: center;
-            margin-top: 14px;
-            color: #666;
-            text-decoration: none;
-        }
-
-        .cancel:hover {
-            color: #b30000;
-        }
-
-        .error {
-            color: red;
-            margin-bottom: 15px;
-        }
-    </style>
-</head>
-
-<body>
-
-<div class="container">
-
-    <h1>🩸 BloodLink NG</h1>
-
-    <p class="subtitle">
-        Update your donor profile. Your existing record is changed &mdash;
-        no new donor is registered.
-    </p>
-
-    <form method="POST">
+{% extends "donors/base.html" %}
+{% block title %}Edit profile — BloodLink NG{% endblock %}
+{% block content %}
+<main class="page">
+  <div class="container">
+    <div class="page-head">
+      <div class="eyebrow">Your donor profile</div>
+      <h1>Edit your profile</h1>
+      <p>Keep your contact details and donation availability current.</p>
+    </div>
+    <div class="card form-card">
+      <form method="POST" novalidate>
         {% csrf_token %}
-
         {{ form.non_field_errors }}
-
-        <label>Name</label>
-        {{ form.name }}
-        {{ form.name.errors }}
-
-        <label>Blood Type</label>
-        {{ form.blood_type }}
-        {{ form.blood_type.errors }}
-
-        <label>Genotype</label>
-        {{ form.genotype }}
-        {{ form.genotype.errors }}
-
-        <label>Location</label>
-        {{ form.location }}
-        {{ form.location.errors }}
-
-        <label>Phone</label>
-        {{ form.phone }}
-        {{ form.phone.errors }}
-
-        <label>Have you donated blood before?</label>
-        {{ form.donation_status }}
-        {{ form.donation_status.errors }}
-
-        <div id="last-donation-field">
-            <label>Last donation date</label>
-            {{ form.last_donation }}
-            {{ form.last_donation.errors }}
+        <div class="form-grid">
+          <div class="field">{{ form.name.label_tag }}{{ form.name }}{% for e in form.name.errors %}<p class="error">{{ e }}</p>{% endfor %}</div>
+          <div class="field">{{ form.phone.label_tag }}{{ form.phone }}{% for e in form.phone.errors %}<p class="error">{{ e }}</p>{% endfor %}</div>
+          <div class="field full">{{ form.location.label_tag }}{{ form.location }}{% for e in form.location.errors %}<p class="error">{{ e }}</p>{% endfor %}</div>
+          <div class="field">{{ form.blood_type.label_tag }}{{ form.blood_type }}{% for e in form.blood_type.errors %}<p class="error">{{ e }}</p>{% endfor %}</div>
+          <div class="field">{{ form.genotype.label_tag }}{{ form.genotype }}{% for e in form.genotype.errors %}<p class="error">{{ e }}</p>{% endfor %}</div>
+          <div class="field full">{{ form.donation_status.label_tag }}{{ form.donation_status }}{% for e in form.donation_status.errors %}<p class="error">{{ e }}</p>{% endfor %}</div>
+          <div class="field full" id="last-donation-field">{{ form.last_donation.label_tag }}{{ form.last_donation }}{% for e in form.last_donation.errors %}<p class="error">{{ e }}</p>{% endfor %}</div>
+          <div class="full">{{ form.availability.label_tag }}{{ form.availability }}{% for e in form.availability.errors %}<p class="error">{{ e }}</p>{% endfor %}</div>
         </div>
-
-        <label>Are you currently available to donate blood?</label>
-        {{ form.availability }}
-        {{ form.availability.errors }}
-
-        <button type="submit">
-            Save Changes
-        </button>
-    </form>
-
-    <a class="cancel" href="{% url 'donor_dashboard' %}">
-        Cancel and return to dashboard
-    </a>
-
-</div>
-
+        <div class="form-footer">
+          <a class="btn btn-ghost" href="{% url 'donor_dashboard' %}">Cancel</a>
+          <button class="btn" type="submit">Save changes</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</main>
 <script>
-    const status = document.getElementById("id_donation_status");
-    const dateField = document.getElementById("last-donation-field");
-
-    function updateDateField() {
-        if (status.value === "before") {
-            dateField.style.display = "block";
-        } else {
-            dateField.style.display = "none";
-        }
-    }
-
-    status.addEventListener("change", updateDateField);
-    updateDateField();
+(function () {
+  const status = document.getElementById("id_donation_status");
+  const field = document.getElementById("last-donation-field");
+  function update() { field.style.display = status && status.value === "before" ? "" : "none"; }
+  if (status) { status.addEventListener("change", update); update(); }
+})();
 </script>
-
-</body>
-</html>
+{% endblock %}

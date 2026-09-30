@@ -1,0 +1,10 @@
+<fieldset class="group{% if field.errors %} has-error{% endif %}">
+    <legend>{{ field.label }}</legend>
+    <div class="chips">
+        {% for radio in field %}
+            <label class="chip">{{ radio.tag }}<span>{{ radio.choice_label }}</span></label>
+        {% endfor %}
+    </div>
+    {% if hint and not field.errors %}<p class="hint">{{ hint }}</p>{% endif %}
+    {% for error in field.errors %}<p class="error">{{ error }}</p>{% endfor %}
+</fieldset>

@@ -1,0 +1,53 @@
+{% extends "donors/base.html" %}
+{% block title %}BloodLink NG — Find blood donors faster{% endblock %}
+{% block content %}
+<main>
+<section class="hero">
+  <div class="container hero-grid">
+    <div>
+      <div class="eyebrow">Blood donation made simpler</div>
+      <h1>Find the right <span>blood donor</span> when it matters.</h1>
+      <p class="hero-copy">BloodLink NG helps people connect with eligible blood donors based on blood type, location and availability.</p>
+      <div class="hero-actions">
+        <a class="btn" href="{% url 'search_donors' %}">Find a donor</a>
+        <a class="btn btn-ghost" href="{% url 'register_donor' %}">Become a donor</a>
+      </div>
+    </div>
+    <div class="hero-panel">
+      <div class="drop">♥</div>
+      <h2>A faster way to connect</h2>
+      <p>Keep your donor details in one place and make it easier for people who need blood to find eligible donors.</p>
+      <div style="margin-top:20px">
+        <div class="hero-stat"><span>Compatibility</span><strong>Blood-type matching</strong></div>
+        <div class="hero-stat"><span>Eligibility</span><strong>90-day check</strong></div>
+        <div class="hero-stat"><span>Contact</span><strong>Phone & WhatsApp</strong></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="section">
+  <div class="container">
+    <div class="section-head">
+      <div class="eyebrow">How it works</div>
+      <h2>Simple tools for donors and people looking for blood.</h2>
+      <p>Everything is designed around quick registration, clear donor information and straightforward contact.</p>
+    </div>
+    <div class="grid-3">
+      <article class="card feature-card"><div class="feature-icon">01</div><h3>Register once</h3><p>Create your donor profile with your blood type, genotype, location and availability.</p></article>
+      <article class="card feature-card"><div class="feature-icon">02</div><h3>Search smarter</h3><p>Search by recipient blood type, location and availability to narrow down eligible donors.</p></article>
+      <article class="card feature-card"><div class="feature-icon">03</div><h3>Connect directly</h3><p>Use the contact options on a donor profile to reach someone who may be able to help.</p></article>
+    </div>
+  </div>
+</section>
+
+<section class="section" style="padding-top:0">
+  <div class="container">
+    <div class="cta">
+      <div><h2>Ready to help save a life?</h2><p>Register your donor profile and keep your availability up to date.</p></div>
+      <a class="btn" href="{% url 'register_donor' %}">Register as a donor</a>
+    </div>
+  </div>
+</section>
+</main>
+{% endblock %}

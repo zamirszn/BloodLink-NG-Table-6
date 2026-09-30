@@ -1,0 +1,51 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{% block title %}BloodLink NG{% endblock %}</title>
+    <link rel="stylesheet" href="{% static 'donors/css/app.css' %}">
+    {% block extra_head %}{% endblock %}
+</head>
+<body>
+<header class="site-header">
+    <div class="container site-header-inner">
+        <a class="brand" href="{% url 'home' %}">
+            <span class="brand-mark">♥</span> BloodLink NG
+        </a>
+        <nav class="nav" aria-label="Main navigation">
+            <a href="{% url 'home' %}" {% if request.resolver_match.url_name == 'home' %}aria-current="page"{% endif %}>Home</a>
+            {% if user.is_authenticated %}
+                <a href="{% url 'donor_dashboard' %}" {% if request.resolver_match.url_name == 'donor_dashboard' %}aria-current="page"{% endif %}>Dashboard</a>
+                <a href="{% url 'search_donors' %}" {% if request.resolver_match.url_name == 'search_donors' %}aria-current="page"{% endif %}>Find a donor</a>
+                <form method="post" action="{% url 'logout' %}">
+                    {% csrf_token %}
+                    <button type="submit">Log out</button>
+                </form>
+            {% else %}
+                <a href="{% url 'login' %}" {% if request.resolver_match.url_name == 'login' %}aria-current="page"{% endif %}>Log in</a>
+                <a class="btn btn-sm" href="{% url 'register_donor' %}">Become a donor</a>
+            {% endif %}
+        </nav>
+    </div>
+</header>
+
+{% if messages %}
+<div class="container flash-wrap">
+    {% for message in messages %}
+        <p class="flash {{ message.tags }}">{{ message }}</p>
+    {% endfor %}
+</div>
+{% endif %}
+
+{% block content %}{% endblock %}
+
+<footer class="site-footer">
+    <div class="container site-footer-inner">
+        <span>BloodLink NG</span>
+        <span>Connecting people to blood donors.</span>
+    </div>
+</footer>
+</body>
+</html>
