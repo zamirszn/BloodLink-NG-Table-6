@@ -1,0 +1,228 @@
+{% extends "donors/base.html" %}
+
+{% block title %}Manage request — BloodLink NG{% endblock %}
+
+{% block content %}
+<main class="page">
+    <div class="container">
+        <div class="page-head">
+            <div class="eyebrow">Control panel</div>
+            <h1>Request control panel</h1>
+            <p>
+                {{ blood_request.recipient_blood_type }} blood{% if blood_request.location %} in {{ blood_request.location }}{% endif %}
+                · posted {{ blood_request.created_at|date:"d M Y" }}
+            </p>
+        </div>
+
+        <p class="status-note status-note-neutral" style="margin-bottom:22px">
+            <strong>Keep this page's address private.</strong>
+            It contains a private key that lets anyone who has it alert donors and
+            change this request, and there is no login to protect it. Bookmark it
+            now if you will need it again.
+        </p>
+
+        <div class="grid-2">
+            <section class="card">
+                <h2 style="font-size:21px">Request</h2>
+
+                <dl class="detail-list" style="margin-top:18px">
+                    <div class="detail-row">
+                        <dt>Status</dt>
+                        <dd>
+                            {% if blood_request.is_open %}
+                                <span class="pill pill-ok">Open</span>
+                            {% else %}
+                                <span class="pill pill-quiet">{{ blood_request.get_status_display }}</span>
+                            {% endif %}
+                        </dd>
+                    </div>
+                    <div class="detail-row">
+                        <dt>Urgency</dt>
+                        <dd>{% include "blood_requests/_urgency.html" with urgency=blood_request.urgency %}</dd>
+                    </div>
+                    <div class="detail-row">
+                        <dt>Blood type needed</dt>
+                        <dd>{{ blood_request.recipient_blood_type }}</dd>
+                    </div>
+                    <div class="detail-row">
+                        <dt>Units needed</dt>
+                        <dd>{{ blood_request.units_needed }}</dd>
+                    </div>
+                    <div class="detail-row">
+                        <dt>Hospital</dt>
+                        <dd>{{ blood_request.hospital|default:"Not specified" }}</dd>
+                    </div>
+                    <div class="detail-row">
+                        <dt>Location</dt>
+                        <dd>{{ blood_request.location|default:"Not specified" }}</dd>
+                    </div>
+                    <div class="detail-row">
+                        <dt>Your contact</dt>
+                        <dd>{{ blood_request.requester_name }} · {{ blood_request.requester_phone }}</dd>
+                    </div>
+                </dl>
+
+                <div class="donor-actions" style="margin-top:18px">
+                    <a class="btn btn-sm btn-ghost"
+                       href="{% url 'blood_requests:blood_request_detail' pk=blood_request.pk %}">
+                        Public view
+                    </a>
+                </div>
+            </section>
+
+            <section class="card">
+                <h2 style="font-size:21px">Alert donors</h2>
+
+                <dl class="detail-list" style="margin-top:18px">
+                    <div class="detail-row">
+                        <dt>Compatible donor types</dt>
+                        <dd>{{ compatible_types|join:", " }}</dd>
+                    </div>
+                    <div class="detail-row">
+                        <dt>Donors matching</dt>
+                        <dd>{{ counts.matched }}</dd>
+                    </div>
+                    <div class="detail-row">
+                        <dt>Already alerted</dt>
+                        <dd>{{ counts.alerted }}</dd>
+                    </div>
+                    <div class="detail-row">
+                        <dt>Said available</dt>
+                        <dd>{{ counts.available }}</dd>
+                    </div>
+                </dl>
+
+                {% if not blood_request.is_open %}
+                    <p class="status-note status-note-neutral">
+                        This request is {{ blood_request.get_status_display|lower }},
+                        so no further donors can be alerted.
+                    </p>
+                {% elif pending_count %}
+                    <form method="POST"
+                          action="{% url 'blood_requests:blood_request_notify' token=blood_request.status_token %}">
+                        {% csrf_token %}
+                        <button class="btn btn-block" type="submit" style="margin-top:18px">
+                            Alert {{ pending_count }} matching donor{{ pending_count|pluralize }}
+                        </button>
+                    </form>
+
+                    <p class="status-note status-note-neutral">
+                        {% if pending_count > max_alerts %}
+                            Only the first {{ max_alerts }} will be alerted on each
+                            press; press again afterwards to reach the rest.
+                        {% else %}
+                            Each donor receives one message with a personal link to
+                            reply. Pressing this again will not message anyone twice.
+                        {% endif %}
+                    </p>
+                {% else %}
+                    <p class="status-note status-note-neutral">
+                        Every matching donor has already been alerted for this request.
+                    </p>
+                {% endif %}
+
+                <p class="status-note status-note-neutral">
+                    Matching is by blood type, the 90-day wait since a donor's last
+                    donation, their availability, and a text match on location.
+                    Donor locations are free text and no map coordinates are held,
+                    so no distance is measured or implied.
+                </p>
+            </section>
+        </div>
+
+        <section class="card" style="margin-top:22px">
+            <h2 style="font-size:21px">Donor replies</h2>
+
+            {% if alerts %}
+                <div class="donor-list" style="margin-top:18px">
+                    {% for alert in alerts %}
+                        <article class="card donor-card">
+                            <div class="donor-card-head">
+                                <div>
+                                    <h3 class="donor-name">{{ alert.donor.name }}</h3>
+                                    <div class="donor-meta">
+                                        <span>{{ alert.donor.location }}</span>
+                                        {% if alert.donor.tel_phone %}
+                                            <span><a href="tel:{{ alert.donor.tel_phone }}">{{ alert.donor.phone }}</a></span>
+                                        {% else %}
+                                            <span>Phone not provided</span>
+                                        {% endif %}
+                                        <span>Alerted {{ alert.created_at|date:"d M Y" }}</span>
+                                    </div>
+                                </div>
+                                <div class="blood-badge">{{ alert.donor.blood_type }}</div>
+                            </div>
+
+                            <div class="donor-status">
+                                {% if alert.response == "available" %}
+                                    <span class="pill pill-ok">Available</span>
+                                {% elif alert.response == "not_available" %}
+                                    <span class="pill pill-quiet">Not available</span>
+                                {% elif alert.delivery_status == "failed" %}
+                                    <span class="pill pill-alert">Not delivered</span>
+                                {% else %}
+                                    <span class="pill pill-urgent">Awaiting reply</span>
+                                {% endif %}
+                            </div>
+
+                            {% if alert.donor.tel_phone %}
+                                <div class="donor-actions">
+                                    <a class="btn btn-sm" href="tel:{{ alert.donor.tel_phone }}">
+                                        Call {{ alert.donor.name }}
+                                    </a>
+                                    {% if alert.donor.wa_url %}
+                                        <a class="btn btn-sm btn-ghost" href="{{ alert.donor.wa_url }}"
+                                           target="_blank" rel="noopener">
+                                            WhatsApp
+                                        </a>
+                                    {% endif %}
+                                </div>
+                            {% endif %}
+                        </article>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <p class="muted" style="margin:0">
+                    No donors have been alerted yet. Use the button above to reach
+                    the donors who match this request.
+                </p>
+            {% endif %}
+        </section>
+
+        <section class="card" style="margin-top:22px">
+            <h2 style="font-size:21px">Change status</h2>
+
+            <form method="POST"
+                  action="{% url 'blood_requests:blood_request_status' token=blood_request.status_token %}">
+                {% csrf_token %}
+
+                <div class="actions" style="margin-top:18px">
+                    <button class="btn" type="submit" name="status" value="fulfilled">
+                        Mark as fulfilled
+                    </button>
+                    <button class="btn btn-ghost" type="submit" name="status" value="cancelled">
+                        Cancel request
+                    </button>
+
+                    {% if not blood_request.is_open %}
+                        <button class="btn btn-ghost" type="submit" name="status" value="open">
+                            Reopen
+                        </button>
+                    {% endif %}
+                </div>
+            </form>
+
+            <p class="status-note status-note-neutral">
+                Once a request is fulfilled or cancelled, donors can no longer
+                reply to it.
+            </p>
+        </section>
+
+        <div class="actions">
+            <a class="btn btn-ghost" href="{% url 'blood_requests:blood_request_list' %}">
+                All requests
+            </a>
+        </div>
+    </div>
+</main>
+{% endblock %}

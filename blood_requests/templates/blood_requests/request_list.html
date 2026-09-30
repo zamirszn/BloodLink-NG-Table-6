@@ -1,0 +1,127 @@
+{% extends "donors/base.html" %}
+
+{% block title %}Blood requests — BloodLink NG{% endblock %}
+
+{% block content %}
+<main class="page">
+    <div class="container">
+        <div class="page-head">
+            <div class="eyebrow">Blood requests</div>
+            <h1>Blood requests</h1>
+            <p>
+                Open requests from patients and hospitals. Post one if someone
+                needs blood, or check the alerts sent to you.
+            </p>
+        </div>
+
+        {% if mine %}
+            <div class="results-head">
+                <div>
+                    <h2>Requests you posted</h2>
+                    <p>Remembered in this browser so you can get back to them.</p>
+                </div>
+            </div>
+
+            <div class="donor-list" style="margin-bottom:34px">
+                {% for item in mine %}
+                    <article class="card donor-card">
+                        <div class="donor-card-head">
+                            <div>
+                                <h3 class="donor-name">{{ item.hospital|default:"A patient needs blood" }}</h3>
+                                <div class="donor-meta">
+                                    <span>{{ item.units_needed }} unit{{ item.units_needed|pluralize }}</span>
+                                    <span>{{ item.location|default:"Location not specified" }}</span>
+                                    <span>Posted {{ item.created_at|date:"d M Y" }}</span>
+                                </div>
+                            </div>
+                            <div class="blood-badge">{{ item.recipient_blood_type }}</div>
+                        </div>
+
+                        <div class="donor-status">
+                            <span class="pill pill-quiet">{{ item.get_status_display }}</span>
+                        </div>
+
+                        <div class="donor-actions">
+                            <a class="btn btn-sm"
+                               href="{% url 'blood_requests:blood_request_manage' token=item.status_token %}">
+                                Open control panel
+                            </a>
+                            <a class="btn btn-sm btn-ghost"
+                               href="{% url 'blood_requests:blood_request_detail' pk=item.pk %}">
+                                View details
+                            </a>
+                        </div>
+                    </article>
+                {% endfor %}
+            </div>
+        {% endif %}
+
+        <div class="results-head">
+            <div>
+                <h2>Open requests</h2>
+                <p>
+                    {% if requests %}
+                        {{ requests|length }} open request{{ requests|length|pluralize }}.
+                    {% else %}
+                        Nothing open right now.
+                    {% endif %}
+                </p>
+            </div>
+        </div>
+
+        <div class="donor-list">
+            {% for item in requests %}
+                <article class="card donor-card">
+                    <div class="donor-card-head">
+                        <div>
+                            <h3 class="donor-name">{{ item.hospital|default:"A patient needs blood" }}</h3>
+                            <div class="donor-meta">
+                                <span>{{ item.units_needed }} unit{{ item.units_needed|pluralize }} needed</span>
+                                <span>{{ item.location|default:"Location not specified" }}</span>
+                                <span>Posted {{ item.created_at|date:"d M Y" }}</span>
+                            </div>
+                        </div>
+                        <div class="blood-badge">{{ item.recipient_blood_type }}</div>
+                    </div>
+
+                    <div class="donor-status">
+                        {% include "blood_requests/_urgency.html" with urgency=item.urgency %}
+                    </div>
+
+                    <div class="donor-actions">
+                        <a class="btn btn-sm btn-ghost"
+                           href="{% url 'blood_requests:blood_request_detail' pk=item.pk %}">
+                            View details
+                        </a>
+                    </div>
+                </article>
+            {% empty %}
+                <div class="card empty-state">
+                    <div class="drop">♥</div>
+                    <h3>No open requests</h3>
+                    <p class="muted" style="margin:8px auto 18px;max-width:500px">
+                        Nobody needs blood right now. When a request is posted it
+                        will appear here.
+                    </p>
+                    <a class="btn" href="{% url 'blood_requests:blood_request_create' %}">
+                        Post a request
+                    </a>
+                </div>
+            {% endfor %}
+        </div>
+
+        {% if requests %}
+            <div class="actions">
+                <a class="btn" href="{% url 'blood_requests:blood_request_create' %}">
+                    Post a blood request
+                </a>
+                {% if user.is_authenticated %}
+                    <a class="btn btn-ghost" href="{% url 'blood_requests:my_alerts' %}">
+                        My alerts
+                    </a>
+                {% endif %}
+            </div>
+        {% endif %}
+    </div>
+</main>
+{% endblock %}

@@ -1,0 +1,8 @@
+{% comment %}
+Urgency pill. Expects `urgency` in context.
+
+Critical uses the solid brand red so an emergency is the one thing on the page
+that cannot be mistaken for decoration; routine recedes to the neutral grey so
+the board is not a wall of colour.
+{% endcomment %}
+{% if urgency == "critical" %}<span class="pill pill-alert">Critical</span>{% elif urgency == "urgent" %}<span class="pill pill-urgent">Urgent</span>{% else %}<span class="pill pill-quiet">Routine</span>{% endif %}

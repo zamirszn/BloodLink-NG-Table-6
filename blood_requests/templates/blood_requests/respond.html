@@ -1,0 +1,130 @@
+{% extends "donors/base.html" %}
+
+{% block title %}Can you donate? — BloodLink NG{% endblock %}
+
+{% block content %}
+<main class="page">
+    <div class="container">
+        <div class="page-head">
+            <div class="eyebrow">Donor reply</div>
+            <h1>Can you donate blood?</h1>
+            <p>
+                {{ alert.donor.name }}, a patient nearby needs your blood type.
+                Please let the requester know either way.
+            </p>
+        </div>
+
+        <div class="grid-2">
+            <section class="card">
+                <div class="donor-card-head">
+                    <div>
+                        <h2 style="font-size:21px">{{ blood_request.hospital|default:"A patient" }}</h2>
+                        <div class="donor-meta">
+                            <span>Posted {{ blood_request.created_at|date:"d M Y" }}</span>
+                        </div>
+                    </div>
+                    <div class="blood-badge">{{ blood_request.recipient_blood_type }}</div>
+                </div>
+
+                <dl class="detail-list" style="margin-top:18px">
+                    <div class="detail-row">
+                        <dt>Urgency</dt>
+                        <dd>{% include "blood_requests/_urgency.html" with urgency=blood_request.urgency %}</dd>
+                    </div>
+                    <div class="detail-row">
+                        <dt>Blood type needed</dt>
+                        <dd>{{ blood_request.recipient_blood_type }}</dd>
+                    </div>
+                    <div class="detail-row">
+                        <dt>Units needed</dt>
+                        <dd>{{ blood_request.units_needed }}</dd>
+                    </div>
+                    <div class="detail-row">
+                        <dt>Location</dt>
+                        <dd>{{ blood_request.location|default:"Not specified" }}</dd>
+                    </div>
+                </dl>
+
+                {% if blood_request.notes %}
+                    <p class="status-note status-note-neutral">{{ blood_request.notes }}</p>
+                {% endif %}
+            </section>
+
+            <section class="card">
+                <h2 style="font-size:21px">Your reply</h2>
+
+                {% if alert.can_respond %}
+                    {% if alert.response != "pending" %}
+                        <div class="donor-status" style="margin-top:18px">
+                            <p class="muted" style="margin:0 0 8px">You replied:</p>
+                            {% if alert.response == "available" %}
+                                <span class="pill pill-ok">Available to donate</span>
+                            {% else %}
+                                <span class="pill pill-quiet">Not available</span>
+                            {% endif %}
+                            <p class="muted" style="margin:10px 0 0;font-size:12px">
+                                You can change your answer until this request is closed.
+                            </p>
+                        </div>
+                    {% endif %}
+
+                    <div class="actions">
+                        <form method="POST">
+                            {% csrf_token %}
+                            <button class="btn" type="submit" name="response" value="available">
+                                Yes, I can donate
+                            </button>
+                        </form>
+
+                        <form method="POST">
+                            {% csrf_token %}
+                            <button class="btn btn-ghost" type="submit" name="response" value="not_available">
+                                No, I cannot
+                            </button>
+                        </form>
+                    </div>
+
+                    <p class="status-note status-note-neutral">
+                        Only your reply is shared automatically. Your phone number is
+                        visible to the requester, who may call you on it.
+                    </p>
+                {% else %}
+                    <p class="status-note status-note-neutral">
+                        {% if not blood_request.is_open %}
+                            This request has been {{ blood_request.get_status_display|lower }},
+                            so it is no longer accepting replies. Thank you for opening
+                            the link.
+                        {% else %}
+                            This reply link has expired. If you can still help, please
+                            contact the requester directly.
+                        {% endif %}
+                    </p>
+
+                    {% if alert.response != "pending" %}
+                        <div class="donor-status">
+                            <p class="muted" style="margin:0 0 8px">Your last answer was:</p>
+                            {% if alert.response == "available" %}
+                                <span class="pill pill-ok">Available to donate</span>
+                            {% else %}
+                                <span class="pill pill-quiet">Not available</span>
+                            {% endif %}
+                        </div>
+                    {% endif %}
+                {% endif %}
+            </section>
+        </div>
+
+        <div class="actions">
+            {% if user.is_authenticated %}
+                <a class="btn btn-ghost" href="{% url 'blood_requests:my_alerts' %}">
+                    All my alerts
+                </a>
+            {% else %}
+                <a class="btn btn-ghost" href="{% url 'blood_requests:blood_request_list' %}">
+                    All requests
+                </a>
+            {% endif %}
+        </div>
+    </div>
+</main>
+{% endblock %}

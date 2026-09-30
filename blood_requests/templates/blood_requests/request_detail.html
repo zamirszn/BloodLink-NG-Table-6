@@ -1,0 +1,160 @@
+{% extends "donors/base.html" %}
+
+{% block title %}{{ blood_request.recipient_blood_type }} request — BloodLink NG{% endblock %}
+
+{% block content %}
+<main class="page">
+    <div class="container">
+        <div class="page-head">
+            <div class="eyebrow">Blood request</div>
+            <h1>
+                {{ blood_request.recipient_blood_type }} blood needed{% if blood_request.location %} in {{ blood_request.location }}{% endif %}
+            </h1>
+            <p>Posted {{ blood_request.created_at|date:"d M Y" }}.</p>
+        </div>
+
+        <div class="grid-2">
+            <section class="card">
+                <div class="donor-card-head">
+                    <div>
+                        <h2 style="font-size:21px">{{ blood_request.hospital|default:"A patient" }}</h2>
+                        <div class="donor-meta">
+                            <span>Posted {{ blood_request.created_at|date:"d M Y" }}</span>
+                        </div>
+                    </div>
+                    <div class="blood-badge">{{ blood_request.recipient_blood_type }}</div>
+                </div>
+
+                <dl class="detail-list" style="margin-top:18px">
+                    <div class="detail-row">
+                        <dt>Urgency</dt>
+                        <dd>{% include "blood_requests/_urgency.html" with urgency=blood_request.urgency %}</dd>
+                    </div>
+                    <div class="detail-row">
+                        <dt>Blood type needed</dt>
+                        <dd>{{ blood_request.recipient_blood_type }}</dd>
+                    </div>
+                    <div class="detail-row">
+                        <dt>Units needed</dt>
+                        <dd>{{ blood_request.units_needed }}</dd>
+                    </div>
+                    <div class="detail-row">
+                        <dt>Hospital</dt>
+                        <dd>{{ blood_request.hospital|default:"Not specified" }}</dd>
+                    </div>
+                    <div class="detail-row">
+                        <dt>Location</dt>
+                        <dd>{{ blood_request.location|default:"Not specified" }}</dd>
+                    </div>
+                    <div class="detail-row">
+                        <dt>Status</dt>
+                        <dd>
+                            {% if blood_request.is_open %}
+                                <span class="pill pill-ok">Open</span>
+                            {% else %}
+                                <span class="pill pill-quiet">{{ blood_request.get_status_display }}</span>
+                            {% endif %}
+                        </dd>
+                    </div>
+                </dl>
+
+                {% if blood_request.notes %}
+                    <p class="status-note status-note-neutral">{{ blood_request.notes }}</p>
+                {% endif %}
+            </section>
+
+            <section class="card">
+                <h2 style="font-size:21px">Matching donors</h2>
+
+                <dl class="detail-list" style="margin-top:18px">
+                    <div class="detail-row">
+                        <dt>Compatible donor types</dt>
+                        <dd>{{ compatible_types|join:", " }}</dd>
+                    </div>
+                    <div class="detail-row">
+                        <dt>Donors matching</dt>
+                        <dd>{{ counts.matched }}</dd>
+                    </div>
+                    <div class="detail-row">
+                        <dt>Alerted so far</dt>
+                        <dd>{{ counts.alerted }}</dd>
+                    </div>
+                    <div class="detail-row">
+                        <dt>Replied</dt>
+                        <dd>{{ counts.responded }}</dd>
+                    </div>
+                    <div class="detail-row">
+                        <dt>Said available</dt>
+                        <dd>{{ counts.available }}</dd>
+                    </div>
+                </dl>
+
+                <p class="status-note status-note-neutral">
+                    A donor counts here when their blood type is compatible, they
+                    have passed the 90-day wait since their last donation, they are
+                    marked available, and — when a location is given — their
+                    recorded location contains that text. Donor locations are free
+                    text and no map coordinates are held, so no distance is
+                    measured or implied.
+                </p>
+            </section>
+        </div>
+
+        <section class="card" style="margin-top:22px">
+            <h2 style="font-size:21px">Donors alerted</h2>
+
+            {% if alerts %}
+                <div class="donor-list" style="margin-top:18px">
+                    {% for alert in alerts %}
+                        <article class="card donor-card">
+                            <div class="donor-card-head">
+                                <div>
+                                    <h3 class="donor-name">{{ alert.donor.name }}</h3>
+                                    <div class="donor-meta">
+                                        <span>{{ alert.donor.location }}</span>
+                                    </div>
+                                </div>
+                                <div class="blood-badge">{{ alert.donor.blood_type }}</div>
+                            </div>
+
+                            <div class="donor-status">
+                                {% if alert.delivery_status == "sent" %}
+                                    <span class="pill pill-ok">Sent</span>
+                                {% elif alert.delivery_status == "failed" %}
+                                    <span class="pill pill-alert">Not delivered</span>
+                                {% else %}
+                                    <span class="pill pill-quiet">Pending</span>
+                                {% endif %}
+
+                                {% if alert.response == "available" %}
+                                    <span class="pill pill-ok">Available</span>
+                                {% elif alert.response == "not_available" %}
+                                    <span class="pill pill-quiet">Not available</span>
+                                {% else %}
+                                    <span class="pill pill-quiet">Awaiting reply</span>
+                                {% endif %}
+                            </div>
+                        </article>
+                    {% endfor %}
+                </div>
+
+                <p class="status-note status-note-neutral">
+                    Contact details are not shown here. They are visible only to
+                    the person who posted this request, on their private control
+                    panel.
+                </p>
+            {% else %}
+                <p class="muted" style="margin:0">
+                    No donors have been alerted for this request yet.
+                </p>
+            {% endif %}
+        </section>
+
+        <div class="actions">
+            <a class="btn btn-ghost" href="{% url 'blood_requests:blood_request_list' %}">
+                All requests
+            </a>
+        </div>
+    </div>
+</main>
+{% endblock %}

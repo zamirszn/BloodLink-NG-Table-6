@@ -250,3 +250,18 @@ fieldset.group { border: 0; padding: 0; margin: 0 0 20px; }
   .form-footer { flex-direction:column-reverse; }
   .form-footer .btn { width:100%; }
 }
+
+/* Blood-request urgency and reply states. The request board needs three
+   urgency levels and pending/closed states, where the donor pages only ever
+   needed ok/off. Same tokens as above, so these sit in the existing palette
+   rather than looking like a second design. */
+.pill-alert  { color:#fff;         background:var(--red); }
+.pill-urgent { color:var(--amber); background:var(--amber-soft); }
+.pill-quiet  { color:var(--muted); background:#f0f2f5; }
+
+/* The donor pages only ever raise success and info messages, so only those
+   two flash variants were styled. Raising a request does raise errors --
+   a closed request, an expired reply link -- and without these they would
+   render in the green success box, which reads as the opposite of the news. */
+.flash.error   { background:var(--red-soft);   color:var(--red-dark); border-color:#f5cdd1; }
+.flash.warning { background:var(--amber-soft); color:var(--amber);    border-color:#f0dcb4; }
