@@ -16,8 +16,8 @@
         </a>
         <nav class="nav" aria-label="Main navigation">
             <a href="{% url 'home' %}" {% if request.resolver_match.url_name == 'home' %}aria-current="page"{% endif %}>Home</a>
-            <a href="{% url 'blood_requests:blood_request_list' %}" {% if request.resolver_match.app_name == 'blood_requests' and request.resolver_match.url_name != 'my_alerts' %}aria-current="page"{% endif %}>Requests</a>
             {% if user.is_authenticated %}
+                <a href="{% url 'blood_requests:blood_request_list' %}" {% if request.resolver_match.app_name == 'blood_requests' and request.resolver_match.url_name != 'my_alerts' %}aria-current="page"{% endif %}>Requests</a>
                 <a href="{% url 'donor_dashboard' %}" {% if request.resolver_match.url_name == 'donor_dashboard' %}aria-current="page"{% endif %}>Dashboard</a>
                 <a href="{% url 'search_donors' %}" {% if request.resolver_match.url_name == 'search_donors' %}aria-current="page"{% endif %}>Find a donor</a>
                 <a href="{% url 'blood_requests:my_alerts' %}" {% if request.resolver_match.url_name == 'my_alerts' %}aria-current="page"{% endif %}>My alerts</a>

@@ -56,7 +56,7 @@
                 {% if alert.can_respond %}
                     {% if alert.response != "pending" %}
                         <div class="donor-status" style="margin-top:18px">
-                            <p class="muted" style="margin:0 0 8px">You replied:</p>
+                            <p class="muted" style="margin:0 0 8px;font-size:12px">You replied:</p>
                             {% if alert.response == "available" %}
                                 <span class="pill pill-ok">Available to donate</span>
                             {% else %}
@@ -102,7 +102,7 @@
 
                     {% if alert.response != "pending" %}
                         <div class="donor-status">
-                            <p class="muted" style="margin:0 0 8px">Your last answer was:</p>
+                            <p class="muted" style="margin:0 0 8px;font-size:12px">Your last answer was:</p>
                             {% if alert.response == "available" %}
                                 <span class="pill pill-ok">Available to donate</span>
                             {% else %}
@@ -120,8 +120,11 @@
                     All my alerts
                 </a>
             {% else %}
-                <a class="btn btn-ghost" href="{% url 'blood_requests:blood_request_list' %}">
-                    All requests
+                {# The board is behind a login, so send a handset visitor there
+                   rather than to a page that would only bounce them. #}
+                <a class="btn btn-ghost"
+                   href="{% url 'login' %}?next={% url 'blood_requests:my_alerts' %}">
+                    Log in to see all your alerts
                 </a>
             {% endif %}
         </div>

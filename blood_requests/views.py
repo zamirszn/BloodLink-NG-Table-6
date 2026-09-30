@@ -1,15 +1,20 @@
 """Publishing blood requests, dispatching alerts, and collecting replies.
 
-A donor is the logged-in user, resolved through the single ``current_donor``
-lookup in :mod:`donors.views`, so the alert inbox is the only view here that
-requires a login.
+Every page here requires a login, for the same reason donor search does: the
+board says who needs blood and where, and the control panel lists the phone
+numbers of the donors who replied.
 
-A requester has no session at all, so their control panel is reached with the
-request's own ``status_token`` rather than its primary key. A primary key is
-guessable and would let a stranger dispatch alerts to real phone numbers or
-close someone else's request. Donors reply through a per-alert token for the
-same reason: the link has to work when opened from a handset, where there is no
-session to log in with.
+The one exception is :func:`alert_respond`. A donor reaches it by tapping the
+link in the alert that was texted to them, on a handset that has no session, so
+requiring a login there would break the reply flow outright. It is a
+capability link instead: the token is personal to one alert and can only ever
+answer that alert.
+
+Two credentials are in play and they are not interchangeable. Being logged in
+opens the page; the request's own ``status_token`` still decides *which*
+request the control panel may act on. A primary key would not do, because it
+is guessable and would let any logged-in stranger dispatch alerts to real
+phone numbers or close someone else's request.
 """
 
 from django.contrib import messages
@@ -53,6 +58,7 @@ def _plural(count, singular, plural=None):
     return singular if count == 1 else (plural or f"{singular}s")
 
 
+@login_required(login_url="login")
 def blood_request_list(request):
     """The open-request board, plus any requests this browser posted."""
     open_requests = BloodRequest.objects.filter(
@@ -69,6 +75,7 @@ def blood_request_list(request):
     })
 
 
+@login_required(login_url="login")
 def blood_request_create(request):
     """Submit a request. The manage page is the success destination."""
     if request.method == "POST":
@@ -103,12 +110,13 @@ def blood_request_create(request):
     return render(request, "blood_requests/request_form.html", {"form": form})
 
 
+@login_required(login_url="login")
 def blood_request_detail(request, pk):
-    """The public view of a request.
+    """The read-only view of a request.
 
-    Deliberately carries no donor phone numbers: this page is reachable by
-    anyone who guesses a primary key, so contact details stay behind the
-    token-gated control panel.
+    Deliberately carries no donor phone numbers. Logging in is what opens the
+    page; the contact details stay behind the token-gated control panel on top
+    of that, so a donor browsing the board still cannot dial a stranger.
     """
     blood_request = get_object_or_404(BloodRequest, pk=pk)
 
@@ -120,6 +128,7 @@ def blood_request_detail(request, pk):
     })
 
 
+@login_required(login_url="login")
 def blood_request_manage(request, token):
     """The requester's control panel, unlocked by the status token."""
     blood_request = get_object_or_404(BloodRequest, status_token=token)
@@ -144,6 +153,7 @@ def blood_request_manage(request, token):
     })
 
 
+@login_required(login_url="login")
 @require_POST
 def blood_request_notify(request, token):
     """Dispatch alerts to matching donors. Safe to press more than once."""
@@ -187,6 +197,7 @@ def blood_request_notify(request, token):
     )
 
 
+@login_required(login_url="login")
 @require_POST
 def blood_request_status(request, token):
     """Mark a request fulfilled or cancelled, or reopen it."""
@@ -216,7 +227,13 @@ def blood_request_status(request, token):
 
 
 def alert_respond(request, token):
-    """The donor's reply page: GET shows the choice, POST records it."""
+    """The donor's reply page: GET shows the choice, POST records it.
+
+    The only view in this module with no login gate, and deliberately so: the
+    donor arrives from the link in their alert, opened on a handset that has no
+    session. The token carries the authority instead, and it is scoped to one
+    alert, so an anonymous visitor can answer their own alert and nothing else.
+    """
     alert = get_object_or_404(
         DonorAlert.objects.select_related("donor", "blood_request"),
         token=token,

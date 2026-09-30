@@ -265,3 +265,36 @@ fieldset.group { border: 0; padding: 0; margin: 0 0 20px; }
    render in the green success box, which reads as the opposite of the news. */
 .flash.error   { background:var(--red-soft);   color:var(--red-dark); border-color:#f5cdd1; }
 .flash.warning { background:var(--amber-soft); color:var(--amber);    border-color:#f0dcb4; }
+
+/* The request form groups eight fields under three headings, where the donor
+   forms are short enough to run flat. The heading itself is the donor-card
+   heading at 20px; the rule above it is the same border-and-padding separator
+   .form-footer already uses, so the sections read as the form's own rhythm
+   rather than a new idea. */
+.form-section-title {
+  font-size: 20px;
+  margin: 28px 0 14px;
+  padding-top: 20px;
+  border-top: 1px solid var(--line);
+}
+
+/* Every heading sits in its own .full wrapper, so the heading is always a
+   :first-child and that pseudo-class cannot pick out the one at the top of
+   the form. Reach through the grid instead: the opening heading has nothing
+   above it to be separated from. */
+.form-grid > .full:first-child > .form-section-title {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: 0;
+}
+
+/* The page-level explainer under the request form. Donors show this kind of
+   standing prose -- "here is how matching works" -- as a quiet card rather
+   than a .status-note, which is reserved for a change in state. Same values
+   as the note on the search page, which is the only other page to carry one. */
+.note-card {
+  padding: 15px 18px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.note-card strong { color: var(--ink); }

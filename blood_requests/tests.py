@@ -4,6 +4,11 @@ Three things are covered, in the order a real user meets them: publishing a
 request, matching and dispatching it to compatible donors, and a donor
 answering the alert they receive.
 
+The request pages are login-gated, so the view tests sign in through
+``sign_in`` below. ``LoginRequiredTests`` pins that gate, including the one
+route that must stay open: the donor's reply link, which is opened from a
+handset with no session.
+
 The matching rules are deliberately asserted against
 ``donors.compatibility.compatible_donor_types`` rather than a re-typed list, so
 this suite fails if the two halves of the project ever disagree about who can
@@ -86,6 +91,19 @@ def make_request(**overrides):
     values.update(overrides)
 
     return BloodRequest.objects.create(**values)
+
+
+def sign_in(client, username="viewer"):
+    """Give a test client a logged-in session.
+
+    Every request page is login-gated, so a test that reaches one has to start
+    from a session. ``force_login`` skips the password check on purpose: logging
+    in properly belongs to Part 1 and is not what these tests are about.
+    """
+    user, _ = User.objects.get_or_create(username=username)
+    client.force_login(user)
+
+    return user
 
 
 class BloodRequestRulesTests(TestCase):
@@ -573,6 +591,10 @@ class RequestCountsTests(TestCase):
 class RequestCreateTests(TestCase):
     """Submitting a request."""
 
+    def setUp(self):
+        # Posting a request is login-gated, so every test here starts signed in.
+        sign_in(self.client)
+
     def _payload(self, **overrides):
         values = {
             "requester_name": "Grace Ade",
@@ -856,6 +878,7 @@ class ManageTests(TestCase):
             "blood_requests:blood_request_manage",
             kwargs={"token": self.blood_request.status_token},
         )
+        sign_in(self.client)
 
     def test_the_panel_renders(self):
         response = self.client.get(self.manage_url)
@@ -871,7 +894,8 @@ class ManageTests(TestCase):
         self.assertEqual(response.status_code, 404)
 
     def test_the_primary_key_is_not_a_valid_way_in(self):
-        # The pk-addressed detail page is public; the control panel must not be.
+        # The pk-addressed detail page is read-only; the control panel, which
+        # can alert donors, must not be reachable by guessing a pk.
         response = self.client.get(f"/requests/manage/{self.blood_request.pk}/")
 
         self.assertEqual(response.status_code, 404)
@@ -1003,14 +1027,15 @@ class ManageTests(TestCase):
 
 
 class PrivacyTests(TestCase):
-    """Contact details must not leak onto pages anyone can reach."""
+    """Contact details must not leak onto pages a donor can browse."""
 
     def setUp(self):
         self.blood_request = make_request(requester_phone="08033334444")
         self.donor = make_donor(name="Ada Obi", phone="08055556666")
         DonorAlert.objects.create(blood_request=self.blood_request, donor=self.donor)
+        sign_in(self.client)
 
-    def test_the_public_detail_page_shows_no_phone_numbers(self):
+    def test_the_detail_page_shows_no_phone_numbers(self):
         response = self.client.get(
             reverse(
                 "blood_requests:blood_request_detail",
@@ -1022,7 +1047,7 @@ class PrivacyTests(TestCase):
         self.assertNotContains(response, self.donor.phone)
         self.assertNotContains(response, self.blood_request.requester_phone)
 
-    def test_the_public_detail_page_still_shows_the_useful_facts(self):
+    def test_the_detail_page_still_shows_the_useful_facts(self):
         response = self.client.get(
             reverse(
                 "blood_requests:blood_request_detail",
@@ -1127,8 +1152,93 @@ class MyAlertsTests(TestCase):
         self.assertContains(response, "Change reply")
 
 
+class LoginRequiredTests(TestCase):
+    """Every request page is behind a login — except the donor's reply link."""
+
+    def setUp(self):
+        self.blood_request = make_request()
+        self.alert = DonorAlert.objects.create(
+            blood_request=self.blood_request, donor=make_donor()
+        )
+
+    def gated_urls(self):
+        token = self.blood_request.status_token
+
+        return [
+            reverse("blood_requests:blood_request_list"),
+            reverse("blood_requests:blood_request_create"),
+            reverse(
+                "blood_requests:blood_request_detail",
+                kwargs={"pk": self.blood_request.pk},
+            ),
+            reverse("blood_requests:blood_request_manage", kwargs={"token": token}),
+            reverse("blood_requests:blood_request_notify", kwargs={"token": token}),
+            reverse("blood_requests:blood_request_status", kwargs={"token": token}),
+        ]
+
+    def test_every_gated_page_sends_an_anonymous_visitor_to_the_login(self):
+        for url in self.gated_urls():
+            with self.subTest(url=url):
+                response = self.client.get(url)
+
+                self.assertEqual(response.status_code, 302)
+                self.assertIn("/login/", response["Location"])
+
+    def test_the_login_remembers_where_the_visitor_was_headed(self):
+        # /login/ reads ?next=, so a bounced donor lands on the board rather
+        # than the dashboard once they are through.
+        url = reverse("blood_requests:blood_request_list")
+
+        response = self.client.get(url)
+
+        self.assertIn(url, response["Location"])
+
+    def test_a_gated_page_cannot_be_posted_to_anonymously(self):
+        response = self.client.post(
+            reverse("blood_requests:blood_request_create"),
+            {
+                "requester_name": "Grace Ade",
+                "requester_phone": "08011112222",
+                "recipient_blood_type": "O-",
+                "urgency": "urgent",
+                "units_needed": "2",
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertIn("/login/", response["Location"])
+
+        # Only setUp's request exists; the blocked POST wrote nothing.
+        self.assertEqual(BloodRequest.objects.count(), 1)
+
+    def test_the_reply_link_still_opens_without_a_login(self):
+        # The whole feature hangs off this: the link arrives by text, on a
+        # handset with no session, so gating it would break the reply flow.
+        response = self.client.get(self.alert.respond_path)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Yes, I can donate")
+
+    def test_an_anonymous_visitor_is_not_offered_the_board_in_the_nav(self):
+        response = self.client.get(reverse("home"))
+
+        self.assertNotContains(
+            response, reverse("blood_requests:blood_request_list")
+        )
+
+    def test_the_board_is_offered_once_signed_in(self):
+        sign_in(self.client)
+
+        response = self.client.get(reverse("home"))
+
+        self.assertContains(response, reverse("blood_requests:blood_request_list"))
+
+
 class RequestListTests(TestCase):
     """The open-request board."""
+
+    def setUp(self):
+        sign_in(self.client)
 
     def test_an_empty_board_shows_an_empty_state(self):
         response = self.client.get(reverse("blood_requests:blood_request_list"))
@@ -1169,6 +1279,7 @@ class CsrfTests(TestCase):
     def setUp(self):
         self.blood_request = make_request()
         self.csrf_client = Client(enforce_csrf_checks=True)
+        sign_in(self.csrf_client)
 
     def test_notifying_without_a_csrf_token_is_forbidden(self):
         response = self.csrf_client.post(
