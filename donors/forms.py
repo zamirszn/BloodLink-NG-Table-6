@@ -1,4 +1,5 @@
 from django import forms
+from .compatibility import ALL_BLOOD_TYPES
 from .models import Donor
 
 
@@ -79,17 +80,16 @@ class DonorForm(forms.ModelForm):
 class DonorSearchForm(forms.Form):
 
     blood_type = forms.ChoiceField(
-        choices=[
-            ("", "Any blood type"),
-            ("A+", "A+"),
-            ("A-", "A-"),
-            ("B+", "B+"),
-            ("B-", "B-"),
-            ("AB+", "AB+"),
-            ("AB-", "AB-"),
-            ("O+", "O+"),
-            ("O-", "O-"),
-        ],
+        label="Recipient Blood Type",
+        # The recipient's blood type, not the donor's: the search returns
+        # every donor whose blood type the recipient can receive.
+        help_text=(
+            "Select the blood type of the person who needs blood. "
+            "We'll show compatible donors. Leave it as "
+            "\"Any blood type\" to list every eligible donor without "
+            "checking compatibility against a recipient."
+        ),
+        choices=[("", "Any blood type")] + [(t, t) for t in ALL_BLOOD_TYPES],
         required=False
     )
 

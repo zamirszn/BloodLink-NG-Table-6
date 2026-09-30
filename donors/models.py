@@ -1,3 +1,5 @@
+import re
+
 from django.db import models
 
 class Donor(models.Model):
@@ -8,6 +10,26 @@ class Donor(models.Model):
     phone = models.CharField(max_length=20)
     last_donation = models.DateField(null=True, blank=True)
     availability = models.BooleanField(default=True)
+
+    @property
+    def tel_phone(self):
+        """The phone field reduced to a safe `tel:` link target.
+
+        Only digits are kept, with an optional single leading "+" preserved
+        for international numbers. Returns "" when there is no usable number,
+        so the template can skip the link instead of rendering a broken one.
+        """
+        raw = (self.phone or "").strip()
+
+        if not raw:
+            return ""
+
+        digits = re.sub(r"\D", "", raw)
+
+        if not digits:
+            return ""
+
+        return f"+{digits}" if raw.startswith("+") else digits
 
     def __str__(self):
         return self.name
