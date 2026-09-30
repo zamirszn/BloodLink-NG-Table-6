@@ -27,7 +27,7 @@
                     <div class="full"><h2 style="font-size:20px">Who needs blood</h2></div>
 
                     {% include "donors/_field.html" with field=form.recipient_blood_type hint=form.recipient_blood_type.help_text %}
-                    {% include "donors/_field.html" with field=form.units_needed %}
+                    {% include "donors/_field.html" with field=form.units_needed hint=form.units_needed.help_text %}
 
                     <div class="full">
                         {% include "donors/_field.html" with field=form.urgency hint=form.urgency.help_text %}
@@ -35,16 +35,16 @@
 
                     <div class="full"><h2 style="font-size:20px">Where</h2></div>
 
-                    {% include "donors/_field.html" with field=form.hospital %}
-                    {% include "donors/_field.html" with field=form.location %}
+                    {% include "donors/_field.html" with field=form.hospital hint=form.hospital.help_text %}
+                    {% include "donors/_field.html" with field=form.location hint=form.location.help_text %}
 
                     <div class="full"><h2 style="font-size:20px">Your contact details</h2></div>
 
-                    {% include "donors/_field.html" with field=form.requester_name %}
-                    {% include "donors/_field.html" with field=form.requester_phone %}
+                    {% include "donors/_field.html" with field=form.requester_name hint=form.requester_name.help_text %}
+                    {% include "donors/_field.html" with field=form.requester_phone hint=form.requester_phone.help_text %}
 
                     <div class="full">
-                        {% include "donors/_field.html" with field=form.notes %}
+                        {% include "donors/_field.html" with field=form.notes hint=form.notes.help_text %}
                     </div>
                 </div>
 
