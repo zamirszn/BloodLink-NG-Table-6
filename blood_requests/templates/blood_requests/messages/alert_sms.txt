@@ -1,0 +1,7 @@
+{% autoescape off %}{{ request.get_urgency_display|upper }} BLOOD NEEDED ({{ request.recipient_blood_type }})
+{{ request.hospital|default:"A patient" }}{% if request.location %} in {{ request.location }}{% endif %} needs {{ request.units_needed }} unit{{ request.units_needed|pluralize }}.
+Please tell us if you can donate, {{ alert.donor.name }}:
+{{ respond_url }}
+
+- BloodLink NG
+{% endautoescape %}

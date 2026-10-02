@@ -1,0 +1,93 @@
+{% extends "donors/base.html" %}
+
+{% block title %}My alerts — BloodLink NG{% endblock %}
+
+{% block content %}
+<main class="page">
+    <div class="container">
+        <div class="page-head">
+            <div class="eyebrow">My alerts</div>
+            <h1>My alerts</h1>
+            <p>
+                Requests you have been matched with. Reply to tell the requester
+                whether you can donate.
+            </p>
+        </div>
+
+        {% if not donor %}
+            <div class="card empty-state">
+                <div class="drop">♥</div>
+                <h3>No donor profile on this account</h3>
+                <p class="muted" style="margin:8px auto 18px;max-width:500px">
+                    Alerts are tied to a donor profile. This account is signed in
+                    but is not registered as a donor, so no request can be matched
+                    to it yet.
+                </p>
+                <a class="btn" href="{% url 'register_donor' %}">Register as a donor</a>
+            </div>
+
+        {% elif alerts %}
+            <div class="donor-list">
+                {% for alert in alerts %}
+                    <article class="card donor-card">
+                        <div class="donor-card-head">
+                            <div>
+                                <h3 class="donor-name">
+                                    {{ alert.blood_request.hospital|default:"A patient needs blood" }}
+                                </h3>
+                                <div class="donor-meta">
+                                    <span>{{ alert.blood_request.location|default:"Location not specified" }}</span>
+                                    <span>{{ alert.blood_request.units_needed }} unit{{ alert.blood_request.units_needed|pluralize }} needed</span>
+                                    <span>Received {{ alert.created_at|date:"d M Y" }}</span>
+                                </div>
+                            </div>
+                            <div class="blood-badge">{{ alert.blood_request.recipient_blood_type }}</div>
+                        </div>
+
+                        <div class="donor-status">
+                            {% if alert.response == "available" %}
+                                <span class="pill pill-ok">Available</span>
+                            {% elif alert.response == "not_available" %}
+                                <span class="pill pill-quiet">Not available</span>
+                            {% elif not alert.blood_request.is_open %}
+                                <span class="pill pill-quiet">Request closed</span>
+                            {% else %}
+                                <span class="pill pill-urgent">Awaiting your reply</span>
+                            {% endif %}
+
+                            {% include "blood_requests/_urgency.html" with urgency=alert.blood_request.urgency %}
+                        </div>
+
+                        <div class="donor-actions">
+                            {% if alert.can_respond %}
+                                <a class="btn btn-sm"
+                                   href="{% url 'blood_requests:alert_respond' token=alert.token %}">
+                                    {% if alert.response == "pending" %}Respond{% else %}Change reply{% endif %}
+                                </a>
+                            {% else %}
+                                <a class="btn btn-sm btn-ghost"
+                                   href="{% url 'blood_requests:alert_respond' token=alert.token %}">
+                                    View details
+                                </a>
+                            {% endif %}
+                        </div>
+                    </article>
+                {% endfor %}
+            </div>
+
+        {% else %}
+            <div class="card empty-state">
+                <div class="drop">♥</div>
+                <h3>No alerts yet</h3>
+                <p class="muted" style="margin:8px auto 18px;max-width:500px">
+                    No open request matches your blood type, location and
+                    eligibility right now. When one does, it will appear here.
+                </p>
+                <a class="btn" href="{% url 'blood_requests:blood_request_list' %}">
+                    Browse requests
+                </a>
+            </div>
+        {% endif %}
+    </div>
+</main>
+{% endblock %}

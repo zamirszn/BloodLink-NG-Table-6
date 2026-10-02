@@ -1,0 +1,67 @@
+{% extends "donors/base.html" %}
+
+{% block title %}Post a blood request — BloodLink NG{% endblock %}
+
+{% block content %}
+<main class="page">
+    <div class="container">
+        <div class="page-head">
+            <div class="eyebrow">Blood requests</div>
+            <h1>Post a blood request</h1>
+            <p>
+                Tell us what is needed and where. Nothing is sent to anyone yet —
+                you will see the matching donors first and decide when to alert
+                them.
+            </p>
+        </div>
+
+        <div class="card form-card">
+            {% if form.non_field_errors %}
+                <div class="form-error">{{ form.non_field_errors }}</div>
+            {% endif %}
+
+            <form method="POST" novalidate>
+                {% csrf_token %}
+
+                <div class="form-grid">
+                    <div class="full"><h2 class="form-section-title">Who needs blood</h2></div>
+
+                    {% include "donors/_field.html" with field=form.recipient_blood_type hint=form.recipient_blood_type.help_text %}
+                    {% include "donors/_field.html" with field=form.units_needed hint=form.units_needed.help_text %}
+
+                    <div class="full">
+                        {% include "donors/_field.html" with field=form.urgency hint=form.urgency.help_text %}
+                    </div>
+
+                    <div class="full"><h2 class="form-section-title">Where</h2></div>
+
+                    {% include "donors/_field.html" with field=form.hospital hint=form.hospital.help_text %}
+                    {% include "donors/_field.html" with field=form.location hint=form.location.help_text %}
+
+                    <div class="full"><h2 class="form-section-title">Your contact details</h2></div>
+
+                    {% include "donors/_field.html" with field=form.requester_name hint=form.requester_name.help_text %}
+                    {% include "donors/_field.html" with field=form.requester_phone hint=form.requester_phone.help_text %}
+
+                    <div class="full">
+                        {% include "donors/_field.html" with field=form.notes hint=form.notes.help_text %}
+                    </div>
+                </div>
+
+                <div class="form-footer">
+                    <a class="btn btn-ghost" href="{% url 'blood_requests:blood_request_list' %}">
+                        Cancel
+                    </a>
+                    <button class="btn" type="submit">Post request</button>
+                </div>
+            </form>
+        </div>
+
+        <div class="card note-card" style="max-width:760px;margin:15px auto 0">
+            Posting a request does not message anyone. You get a private control
+            panel next, where you can see the donors who match and alert them when
+            you are ready. Keep that page's address — it is the only way back in.
+        </div>
+    </div>
+</main>
+{% endblock %}
