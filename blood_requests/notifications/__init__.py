@@ -11,11 +11,14 @@ from django.utils.module_loading import import_string
 
 from .base import DeliveryResult, NotificationBackend, OutgoingMessage
 from .console import ConsoleBackend
+from .providers import AfricasTalkingBackend, TermiiBackend
 
 DEFAULT_BACKEND = "blood_requests.notifications.ConsoleBackend"
 
 __all__ = [
+    "AfricasTalkingBackend",
     "ConsoleBackend",
+    "TermiiBackend",
     "DeliveryResult",
     "NotificationBackend",
     "OutgoingMessage",

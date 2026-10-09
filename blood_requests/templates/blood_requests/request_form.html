@@ -35,8 +35,15 @@
 
                     <div class="full"><h2 class="form-section-title">Where</h2></div>
 
-                    {% include "donors/_field.html" with field=form.hospital hint=form.hospital.help_text %}
-                    {% include "donors/_field.html" with field=form.location hint=form.location.help_text %}
+                    <div class="full">
+                        {% include "donors/_field.html" with field=form.hospital hint=form.hospital.help_text %}
+                    </div>
+
+                    {% include "donors/_location_fields.html" %}
+
+                    <div class="full">
+                        <p class="hint">Optional. Pick only a state to reach donors across the whole state, or add an LGA to narrow it down.</p>
+                    </div>
 
                     <div class="full"><h2 class="form-section-title">Your contact details</h2></div>
 

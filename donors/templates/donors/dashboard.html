@@ -12,6 +12,9 @@
     </div>
     <a class="btn" href="{% url 'search_donors' %}">Find a donor</a>
   </div>
+  {% if not phone_verified %}
+  <div class="card" role="alert" style="margin-bottom:16px"><strong>Verify your phone number.</strong> Unverified donors are hidden from search and receive no alerts. <a class="btn btn-sm" href="{% url 'verify_phone' %}">Verify now</a></div>
+  {% endif %}
   <div class="profile-card">
     <section class="card">
       <div class="profile-top">
@@ -36,10 +39,29 @@
         {% else %}
           <p class="status-note status-note-bad">You can donate again from {{ next_eligible_date|date:"d M Y" }}.</p>
         {% endif %}
+        {% if donor.sms_opt_out %}<p class="status-note status-note-neutral">You replied STOP, so you receive no alerts. Edit your profile and choose "available" to receive them again.</p>{% endif %}
         {% if not donor.availability %}<p class="status-note status-note-neutral">You are currently unavailable and won't appear in donor search results.</p>{% endif %}
       </div>
     </section>
   </div>
+  {% if pending_donations %}
+  <section class="card" style="margin-top:16px"><h2 style="font-size:19px">Confirm your donation</h2>
+    {% for d in pending_donations %}
+    <p>A requester recorded that you donated on <strong>{{ d.donated_on|date:"d M Y" }}</strong>.</p>
+    <form method="post" action="{% url 'blood_requests:confirm_donation' pk=d.pk %}">{% csrf_token %}
+      <button class="btn btn-sm" type="submit" name="decision" value="confirm">Yes, I donated</button>
+      <button class="btn btn-sm btn-ghost" type="submit" name="decision" value="reject">No, that is wrong</button>
+    </form>
+    {% endfor %}
+  </section>
+  {% endif %}
+  <section class="card" style="margin-top:16px"><h2 style="font-size:19px">Donation history</h2>
+    {% for d in history %}
+      <div class="detail-row"><dt>{{ d.donated_on|date:"d M Y" }}</dt><dd>{{ d.units }} unit{{ d.units|pluralize }}{% if d.blood_request %} · request #{{ d.blood_request_id }}{% endif %}</dd></div>
+    {% empty %}
+      <p class="muted">No confirmed donations on record yet.</p>
+    {% endfor %}
+  </section>
   <div class="actions">
     <a class="btn btn-ghost" href="{% url 'edit_donor' %}">Edit profile</a>
     <a class="btn btn-ghost" href="{% url 'search_donors' %}">Search donors</a>

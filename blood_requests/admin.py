@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import BloodRequest, DonorAlert, NotificationMessage
+from .models import BloodRequest, Donation, DonorAlert, NotificationMessage
 
 
 class DonorAlertInline(admin.TabularInline):
@@ -32,14 +32,20 @@ class BloodRequestAdmin(admin.ModelAdmin):
         "location",
         "urgency",
         "status",
+        "expires_at",
+        "hospital_verified",
         "units_needed",
         "requester_name",
         "created_at",
     )
-    list_filter = ("status", "urgency", "recipient_blood_type")
+    list_filter = ("status", "urgency", "recipient_blood_type", "hospital_verified")
     search_fields = ("requester_name", "hospital", "location", "requester_phone")
     # The control-panel credential must never be editable from the admin.
-    readonly_fields = ("status_token", "created_at", "updated_at")
+    readonly_fields = ("status_token", "requester_user", "expiry_reminder_sent_at", "created_at", "updated_at")
+    fieldsets = (
+        ("Request", {"fields": ("requester_name", "requester_phone", "hospital", "hospital_verified", "recipient_blood_type", "location", "urgency", "units_needed", "notes", "status", "expires_at")}),
+        ("System", {"fields": ("status_token", "requester_user", "expiry_reminder_sent_at", "created_at", "updated_at")}),
+    )
     inlines = [DonorAlertInline]
 
 
@@ -72,4 +78,12 @@ class NotificationMessageAdmin(admin.ModelAdmin):
     )
     list_filter = ("backend", "channel", "status")
     search_fields = ("recipient_phone", "body")
+    readonly_fields = ("created_at",)
+
+
+@admin.register(Donation)
+class DonationAdmin(admin.ModelAdmin):
+    list_display = ("donor", "donated_on", "units", "blood_request", "recorded_by", "confirmed_by_donor_at")
+    list_filter = ("donated_on",)
+    search_fields = ("donor__name", "donor__phone")
     readonly_fields = ("created_at",)

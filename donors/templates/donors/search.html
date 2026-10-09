@@ -13,7 +13,7 @@
       <h2 style="font-size:20px;margin-bottom:20px">Search filters</h2>
       <form method="GET">
         {% include "donors/choice_group.html" with field=form.blood_type %}
-        {% include "donors/_field.html" with field=form.location %}
+        {% include "donors/_location_fields.html" %}
         <div class="field">{{ form.availability.label_tag }}{{ form.availability }}</div>
         <button class="btn btn-block" type="submit">Search donors</button>
       </form>

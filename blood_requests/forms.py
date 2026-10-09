@@ -1,11 +1,11 @@
 from django import forms
 
-from donors.forms import ControlMixin
+from donors.forms import ControlMixin, LocationFieldsMixin
 
 from .models import BLOOD_TYPE_CHOICES, BloodRequest
 
 
-class BloodRequestForm(ControlMixin, forms.ModelForm):
+class BloodRequestForm(LocationFieldsMixin, ControlMixin, forms.ModelForm):
     """The public request-submission form.
 
     Blood type and urgency are declared explicitly with an empty first choice
@@ -26,6 +26,9 @@ class BloodRequestForm(ControlMixin, forms.ModelForm):
         help_text="Choose Critical when the need is immediate.",
     )
 
+    # A blank location is allowed: it means "no restriction on matching".
+    location_required = False
+
     class Meta:
         model = BloodRequest
         fields = [
@@ -33,7 +36,6 @@ class BloodRequestForm(ControlMixin, forms.ModelForm):
             "requester_phone",
             "hospital",
             "recipient_blood_type",
-            "location",
             "urgency",
             "units_needed",
             "notes",
@@ -41,7 +43,6 @@ class BloodRequestForm(ControlMixin, forms.ModelForm):
         labels = {
             "requester_name": "Your name",
             "requester_phone": "Phone number",
-            "location": "Location",
             "units_needed": "Units needed",
             "notes": "Additional details",
         }
@@ -55,12 +56,6 @@ class BloodRequestForm(ControlMixin, forms.ModelForm):
             "hospital": forms.TextInput(
                 attrs={"placeholder": "Optional — leave blank if this is for one patient"}
             ),
-            "location": forms.TextInput(
-                attrs={
-                    "placeholder": "e.g. Makurdi",
-                    "maxlength": 200,
-                }
-            ),
             "units_needed": forms.NumberInput(attrs={"min": 1, "max": 20}),
             "notes": forms.Textarea(
                 attrs={
@@ -69,10 +64,6 @@ class BloodRequestForm(ControlMixin, forms.ModelForm):
                 }
             ),
         }
-
-    def clean_location(self):
-        """Trim surrounding space so a stray keystroke can't change matching."""
-        return (self.cleaned_data.get("location") or "").strip()
 
     def clean_requester_name(self):
         return self.cleaned_data["requester_name"].strip()

@@ -19,6 +19,7 @@ from datetime import date, timedelta
 from unittest import mock
 
 from django.contrib.auth.models import User
+from django.core.cache import cache
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError
 from django.test import Client, TestCase, override_settings
@@ -33,6 +34,7 @@ from .matching import (
     donors_to_alert,
     eligible_donors,
     notify_matching_donors,
+    open_requests_for_donor,
     request_counts,
 )
 from .models import BloodRequest, DonorAlert, NotificationMessage
@@ -73,6 +75,8 @@ def make_donor(**overrides):
         "phone": "08000000000",
         "last_donation": None,
         "availability": True,
+        # Search and alerts only include verified numbers (F2).
+        "phone_verified_at": timezone.now(),
     }
     values.update(overrides)
 
@@ -87,6 +91,7 @@ def make_request(**overrides):
         "recipient_blood_type": "O-",
         "location": "Makurdi",
         "urgency": BloodRequest.Urgency.URGENT,
+        "requester_phone_verified_at": timezone.now(),
     }
     values.update(overrides)
 
@@ -481,7 +486,7 @@ class NotifyTests(TestCase):
         make_donor(name="b")
 
         # assertLogs also keeps the handled traceback out of the test output.
-        with self.assertLogs("blood_requests.matching", level="ERROR"):
+        with self.assertLogs("blood_requests.delivery", level="ERROR"):
             created, _ = notify_matching_donors(
                 blood_request, base_url="http://testserver/"
             )
@@ -595,12 +600,17 @@ class RequestCreateTests(TestCase):
         # Posting a request is login-gated, so every test here starts signed in.
         sign_in(self.client)
 
+        # The spam throttle counts per phone/IP in the shared local-memory
+        # cache, so earlier tests would otherwise use up this test's allowance.
+        cache.clear()
+
     def _payload(self, **overrides):
         values = {
             "requester_name": "Grace Ade",
             "requester_phone": "08011112222",
             "recipient_blood_type": "O-",
-            "location": "Makurdi",
+            "state": "Benue",
+            "lga": "Makurdi",
             "urgency": "urgent",
             "units_needed": "2",
             "hospital": "St. Mary's",
@@ -731,7 +741,7 @@ class RequestCreateTests(TestCase):
     def test_hospital_location_and_notes_may_be_blank(self):
         self.client.post(
             reverse("blood_requests:blood_request_create"),
-            self._payload(hospital="", location="", notes=""),
+            self._payload(hospital="", state="", lga="", notes=""),
         )
 
         self.assertEqual(BloodRequest.objects.count(), 1)
@@ -739,13 +749,43 @@ class RequestCreateTests(TestCase):
     def test_surrounding_whitespace_is_trimmed(self):
         self.client.post(
             reverse("blood_requests:blood_request_create"),
-            self._payload(location="  Makurdi  ", requester_name="  Grace Ade  "),
+            self._payload(requester_name="  Grace Ade  "),
         )
 
         blood_request = BloodRequest.objects.get()
 
-        self.assertEqual(blood_request.location, "Makurdi")
         self.assertEqual(blood_request.requester_name, "Grace Ade")
+
+    def test_state_and_lga_are_stored_as_one_location(self):
+        self.client.post(
+            reverse("blood_requests:blood_request_create"), self._payload()
+        )
+
+        self.assertEqual(BloodRequest.objects.get().location, "Makurdi, Benue")
+
+    def test_a_state_alone_is_a_valid_location(self):
+        self.client.post(
+            reverse("blood_requests:blood_request_create"),
+            self._payload(state="Lagos", lga=""),
+        )
+
+        self.assertEqual(BloodRequest.objects.get().location, "Lagos")
+
+    def test_no_location_means_no_restriction(self):
+        self.client.post(
+            reverse("blood_requests:blood_request_create"),
+            self._payload(state="", lga=""),
+        )
+
+        self.assertEqual(BloodRequest.objects.get().location, "")
+
+    def test_an_lga_from_another_state_is_rejected(self):
+        self.client.post(
+            reverse("blood_requests:blood_request_create"),
+            self._payload(state="Lagos", lga="Makurdi"),
+        )
+
+        self.assertEqual(BloodRequest.objects.count(), 0)
 
 
 class ReplyTests(TestCase):
@@ -1099,11 +1139,14 @@ class MyAlertsTests(TestCase):
         self.assertContains(response, "No donor profile on this account")
 
     def test_a_donor_with_no_alerts_sees_an_empty_state(self):
-        self._sign_in(make_donor(name="Unrelated", phone="08077778888"))
+        # AB+ blood cannot go to the O- request in setUp, so nothing matches.
+        self._sign_in(
+            make_donor(name="Unrelated", phone="08077778888", blood_type="AB+")
+        )
 
         response = self.client.get(self.url)
 
-        self.assertContains(response, "No alerts yet")
+        self.assertContains(response, "Nothing for you right now")
 
     def test_only_the_signed_in_donors_alerts_are_listed(self):
         # The page lists alerts from the donor's own point of view, so the
@@ -1113,7 +1156,8 @@ class MyAlertsTests(TestCase):
 
         other = make_donor(name="Someone Else", phone="08099990000")
         DonorAlert.objects.create(
-            blood_request=make_request(hospital="Other Hospital"), donor=other
+            blood_request=make_request(hospital="Other Hospital", location="Enugu"),
+            donor=other,
         )
 
         self._sign_in(self.donor)
@@ -1150,6 +1194,137 @@ class MyAlertsTests(TestCase):
 
         self.assertContains(response, "Not available")
         self.assertContains(response, "Change reply")
+
+
+class MatchingRequestsOnAlertsPageTests(TestCase):
+    """Open requests the donor fits are listed even before an alert is sent."""
+
+    def setUp(self):
+        self.donor = make_donor(name="Ada Obi", location="Makurdi, Benue")
+        user = User.objects.create(username=self.donor.phone)
+        self.donor.user = user
+        self.donor.save(update_fields=["user"])
+        self.client.force_login(user)
+        self.url = reverse("blood_requests:my_alerts")
+
+    def _page(self):
+        return self.client.get(self.url)
+
+    def test_a_matching_open_request_is_listed_without_any_alert(self):
+        blood_request = make_request(
+            hospital="General Hospital", location="Makurdi, Benue"
+        )
+
+        response = self._page()
+
+        self.assertContains(response, "Open requests that match you")
+        self.assertContains(response, "General Hospital")
+        self.assertContains(
+            response,
+            reverse("blood_requests:blood_request_detail", args=[blood_request.pk]),
+        )
+        self.assertEqual(DonorAlert.objects.count(), 0)
+
+    def test_listing_a_match_does_not_create_an_alert_or_message(self):
+        make_request(location="Makurdi, Benue")
+
+        self._page()
+
+        self.assertEqual(DonorAlert.objects.count(), 0)
+        self.assertEqual(NotificationMessage.objects.count(), 0)
+
+    def test_a_request_already_alerted_appears_only_as_an_alert(self):
+        blood_request = make_request(
+            hospital="General Hospital", location="Makurdi, Benue"
+        )
+        DonorAlert.objects.create(blood_request=blood_request, donor=self.donor)
+
+        response = self._page()
+
+        self.assertContains(response, "Sent to you")
+        self.assertNotContains(response, "Open requests that match you")
+        self.assertContains(response, "General Hospital", count=1)
+
+    def test_a_closed_request_is_not_listed(self):
+        make_request(
+            hospital="Closed Clinic",
+            location="Makurdi, Benue",
+            status=BloodRequest.Status.FULFILLED,
+        )
+
+        self.assertNotContains(self._page(), "Closed Clinic")
+
+    def test_a_request_the_donor_cannot_give_to_is_not_listed(self):
+        self.donor.blood_type = "A+"
+        self.donor.save(update_fields=["blood_type"])
+        make_request(
+            hospital="Wrong Type", recipient_blood_type="B+", location="Makurdi, Benue"
+        )
+
+        self.assertNotContains(self._page(), "Wrong Type")
+
+    def test_a_request_in_another_place_is_not_listed(self):
+        make_request(hospital="Far Away", location="Ikeja, Lagos")
+
+        self.assertNotContains(self._page(), "Far Away")
+
+    def test_a_state_wide_request_matches_donors_in_that_state(self):
+        make_request(hospital="Statewide Need", location="Benue")
+
+        self.assertContains(self._page(), "Statewide Need")
+
+    def test_a_request_with_no_location_matches_everywhere(self):
+        make_request(hospital="Anywhere Need", location="")
+
+        self.assertContains(self._page(), "Anywhere Need")
+
+    def test_an_unavailable_donor_sees_no_matches(self):
+        self.donor.availability = False
+        self.donor.save(update_fields=["availability"])
+        make_request(hospital="General Hospital", location="Makurdi, Benue")
+
+        self.assertNotContains(self._page(), "General Hospital")
+
+    def test_a_donor_inside_the_90_day_wait_sees_no_matches(self):
+        self.donor.last_donation = date.today() - timedelta(days=30)
+        self.donor.save(update_fields=["last_donation"])
+        make_request(hospital="General Hospital", location="Makurdi, Benue")
+
+        self.assertNotContains(self._page(), "General Hospital")
+
+    def test_the_donors_own_request_is_not_listed(self):
+        make_request(
+            hospital="My Own Request",
+            location="Makurdi, Benue",
+            requester_phone=self.donor.phone,
+        )
+
+        self.assertNotContains(self._page(), "My Own Request")
+
+    def test_critical_requests_come_before_routine_ones(self):
+        make_request(
+            hospital="Routine Place",
+            location="Makurdi, Benue",
+            urgency=BloodRequest.Urgency.ROUTINE,
+        )
+        make_request(
+            hospital="Critical Place",
+            location="Makurdi, Benue",
+            urgency=BloodRequest.Urgency.CRITICAL,
+        )
+
+        content = self._page().content.decode()
+
+        self.assertLess(content.index("Critical Place"), content.index("Routine Place"))
+
+    def test_it_agrees_with_the_dispatch_rules(self):
+        """A request shown here is one a dispatch would alert this donor for."""
+        blood_request = make_request(location="Makurdi, Benue")
+
+        shown = open_requests_for_donor(self.donor)
+
+        self.assertEqual(shown, [blood_request])
+        self.assertIn(self.donor, donors_to_alert(blood_request))
 
 
 class LoginRequiredTests(TestCase):
