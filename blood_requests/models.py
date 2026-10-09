@@ -12,6 +12,7 @@ this module would need to change to add it.
 import secrets
 from datetime import timedelta
 
+from django.conf import settings
 from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
 from django.urls import reverse
@@ -37,6 +38,21 @@ def generate_token():
     return secrets.token_urlsafe(32)
 
 
+def default_expires_at(urgency, now=None):
+    """When a request of this urgency lapses, from REQUEST_EXPIRY_DAYS."""
+    days = settings.REQUEST_EXPIRY_DAYS.get(urgency, settings.REQUEST_EXPIRY_DAYS["urgent"])
+
+    return (now or timezone.now()) + timedelta(days=days)
+
+
+class BloodRequestQuerySet(models.QuerySet):
+    def open_now(self):
+        """Open and not past its expiry, even if the daily job has not run yet."""
+        return self.filter(status=BloodRequest.Status.OPEN).filter(
+            models.Q(expires_at__isnull=True) | models.Q(expires_at__gt=timezone.now())
+        )
+
+
 class BloodRequest(models.Model):
     """A published need for blood, from a patient or a hospital."""
 
@@ -49,15 +65,41 @@ class BloodRequest(models.Model):
         OPEN = "open", "Open"
         FULFILLED = "fulfilled", "Fulfilled"
         CANCELLED = "cancelled", "Cancelled"
+        EXPIRED = "expired", "Expired"
+
+    objects = BloodRequestQuerySet.as_manager()
+
+    # F7: the account that posted the request. Null for requests made before
+    # accounts owned them; those stay reachable by their token alone.
+    requester_user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        editable=False,
+        on_delete=models.SET_NULL,
+        related_name="blood_requests",
+    )
+
+    # F5: when the request lapses, and when its 24-hour warning went out.
+    expires_at = models.DateTimeField(null=True, blank=True)
+    expiry_reminder_sent_at = models.DateTimeField(null=True, blank=True)
 
     requester_name = models.CharField(max_length=100)
 
     requester_phone = models.CharField(max_length=20)
 
+    # F2: set once the requester proves they control requester_phone.
+    requester_phone_verified_at = models.DateTimeField(null=True, blank=True)
+
     hospital = models.CharField(
         max_length=150,
         blank=True,
         help_text="Optional. Leave blank for an individual patient.",
+    )
+
+    hospital_verified = models.BooleanField(
+        default=False,
+        help_text="Only staff should enable this after independently verifying the hospital.",
     )
 
     # The type the *recipient* needs. Which donors can supply it is decided
@@ -116,10 +158,35 @@ class BloodRequest(models.Model):
 
         return f"{self.recipient_blood_type} request for {where} ({self.get_urgency_display()})"
 
+    def save(self, *args, **kwargs):
+        # New requests get an expiry from their urgency unless one was given.
+        if self._state.adding and self.expires_at is None:
+            self.expires_at = default_expires_at(self.urgency)
+
+        super().save(*args, **kwargs)
+
     @property
     def is_open(self):
-        """Whether donors can still be alerted and still respond."""
-        return self.status == self.Status.OPEN
+        """Whether donors can still be alerted and still respond.
+
+        Checks the clock as well as the status, so a request stops accepting
+        replies the moment it lapses rather than when the daily job runs.
+        """
+        if self.status != self.Status.OPEN:
+            return False
+
+        return self.expires_at is None or self.expires_at > timezone.now()
+
+    @property
+    def can_extend(self):
+        return self.status in (self.Status.OPEN, self.Status.EXPIRED)
+
+    def extend(self):
+        """Restart the clock from now and reopen if it had expired."""
+        self.expires_at = default_expires_at(self.urgency)
+        self.expiry_reminder_sent_at = None
+        self.status = self.Status.OPEN
+        self.save(update_fields=["expires_at", "expiry_reminder_sent_at", "status", "updated_at"])
 
     @property
     def compatible_donor_types(self):
@@ -143,8 +210,15 @@ class DonorAlert(models.Model):
 
     class DeliveryStatus(models.TextChoices):
         PENDING = "pending", "Pending"
+        SENDING = "sending", "Sending"
+        NOT_SENT = "not_sent", "Not sent (volunteer)"
         SENT = "sent", "Sent"
+        DELIVERED = "delivered", "Delivered"
         FAILED = "failed", "Failed"
+
+    class Source(models.TextChoices):
+        DISPATCH = "dispatch", "Alerted by requester"
+        VOLUNTEER = "volunteer", "Volunteered"
 
     class Response(models.TextChoices):
         PENDING = "pending", "Awaiting reply"
@@ -184,12 +258,25 @@ class DonorAlert(models.Model):
     )
 
     delivery_status = models.CharField(
-        max_length=8,
+        max_length=12,
         choices=DeliveryStatus.choices,
         default=DeliveryStatus.PENDING,
     )
 
     sent_at = models.DateTimeField(null=True, blank=True)
+
+    # F6: who started this alert. Volunteers are never texted by dispatch.
+    source = models.CharField(
+        max_length=9,
+        choices=Source.choices,
+        default=Source.DISPATCH,
+    )
+
+    # Idempotent sending: a worker claims an alert by moving it to SENDING and
+    # stamping claimed_at; a claim older than the stale window can be retaken.
+    claimed_at = models.DateTimeField(null=True, blank=True)
+
+    send_attempts = models.PositiveSmallIntegerField(default=0)
 
     response = models.CharField(
         max_length=13,
@@ -244,6 +331,7 @@ class NotificationMessage(models.Model):
 
     class Status(models.TextChoices):
         SENT = "sent", "Sent"
+        DELIVERED = "delivered", "Delivered"
         FAILED = "failed", "Failed"
 
     # Kept even if the alert is later removed, so the outbox stays a faithful
@@ -264,9 +352,12 @@ class NotificationMessage(models.Model):
 
     backend = models.CharField(max_length=50)
 
-    status = models.CharField(max_length=8, choices=Status.choices)
+    status = models.CharField(max_length=12, choices=Status.choices)
 
     detail = models.TextField(blank=True)
+
+    # The provider's id, so a delivery receipt can find this row.
+    provider_message_id = models.CharField(max_length=100, blank=True, db_index=True)
 
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -275,3 +366,55 @@ class NotificationMessage(models.Model):
 
     def __str__(self):
         return f"{self.channel} to {self.recipient_phone} ({self.status})"
+
+
+class Donation(models.Model):
+    """A donation. It only counts once the donor confirms it (F4).
+
+    The requester (or staff) records that a responding donor gave blood; the
+    donor then confirms. Until then ``last_donation`` is untouched, so nobody
+    can put a stranger into a waiting period by claiming they donated.
+    """
+
+    donor = models.ForeignKey("donors.Donor", on_delete=models.CASCADE, related_name="donations")
+    blood_request = models.ForeignKey(
+        BloodRequest, null=True, blank=True, on_delete=models.SET_NULL, related_name="donations"
+    )
+    donated_on = models.DateField()
+    units = models.PositiveSmallIntegerField(default=1, validators=[MinValueValidator(1)])
+    recorded_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+"
+    )
+    confirmed_by_donor_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-donated_on", "-created_at"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["donor", "blood_request"],
+                condition=models.Q(blood_request__isnull=False),
+                name="one_donation_per_donor_per_request",
+            ),
+        ]
+
+    def __str__(self):
+        return f"{self.donor.name} on {self.donated_on}"
+
+    @property
+    def is_confirmed(self):
+        return self.confirmed_by_donor_at is not None
+
+    def confirm(self, now=None):
+        """Donor confirmation: the only thing that moves ``last_donation``."""
+        if self.is_confirmed:
+            return
+
+        self.confirmed_by_donor_at = now or timezone.now()
+        self.save(update_fields=["confirmed_by_donor_at"])
+
+        donor = self.donor
+
+        if donor.last_donation is None or self.donated_on > donor.last_donation:
+            donor.last_donation = self.donated_on
+            donor.save(update_fields=["last_donation"])

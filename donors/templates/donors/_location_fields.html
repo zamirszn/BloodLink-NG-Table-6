@@ -1,0 +1,48 @@
+{% load location_tags %}
+{% comment %}
+State + LGA dropdowns. Expects `form` to use LocationFieldsMixin. Renders two
+.field blocks (they sit side by side inside a .form-grid) and the small script
+that refills the LGA list when the state changes. Include once per page.
+{% endcomment %}
+<div class="field{% if form.state.errors %} has-error{% endif %}">
+  <label for="{{ form.state.id_for_label }}">{{ form.state.label }}</label>
+  {{ form.state }}
+  {% for e in form.state.errors %}<p class="error">{{ e }}</p>{% endfor %}
+</div>
+<div class="field{% if form.lga.errors %} has-error{% endif %}">
+  <label for="{{ form.lga.id_for_label }}">{{ form.lga.label }}</label>
+  {{ form.lga }}
+  {% for e in form.lga.errors %}<p class="error">{{ e }}</p>{% endfor %}
+</div>
+{% location_data %}
+<script>
+(function () {
+  var state = document.getElementById("{{ form.state.id_for_label }}");
+  var lga = document.getElementById("{{ form.lga.id_for_label }}");
+  var source = document.getElementById("ng-locations");
+  if (!state || !lga || !source) return;
+
+  var data = JSON.parse(source.textContent);
+  var anyLabel = lga.getAttribute("data-any-label") || "Select LGA";
+
+  function option(value, label) {
+    var o = document.createElement("option");
+    o.value = value;
+    o.textContent = label;
+    return o;
+  }
+
+  function fill() {
+    var current = lga.value;
+    var list = data[state.value] || [];
+    lga.innerHTML = "";
+    lga.appendChild(option("", list.length ? anyLabel : "Select a state first"));
+    list.forEach(function (name) { lga.appendChild(option(name, name)); });
+    if (list.indexOf(current) !== -1) lga.value = current;
+    lga.disabled = list.length === 0;
+  }
+
+  state.addEventListener("change", fill);
+  fill();
+})();
+</script>

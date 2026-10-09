@@ -8,6 +8,9 @@ from .views import (
     register_donor,
     search_donors,
     home,
+    password_reset_confirm,
+    password_reset_request,
+    verify_phone,
 )
 
 urlpatterns = [
@@ -19,5 +22,8 @@ urlpatterns = [
     path("search/", search_donors, name="search_donors"),
     path("dashboard/", donor_dashboard, name="donor_dashboard"),
     path("dashboard/edit/", edit_donor, name="edit_donor"),
+    path("verify/", verify_phone, name="verify_phone"),
+    path("password-reset/", password_reset_request, name="password_reset_request"),
+    path("password-reset/confirm/", password_reset_confirm, name="password_reset_confirm"),
 
 ]

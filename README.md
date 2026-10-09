@@ -1,100 +1,78 @@
-# BloodLink-NG -Table-6
-
-
 # BloodLink NG
 
-## Project Objective
-BloodLink NG solves the problem of slow, unreliable blood donor matching in Nigeria, where patients and hospitals currently rely on informal social media or word-of-mouth networks during emergencies. The platform lets donors register their blood type and availability, and enables patients/hospitals to instantly search and connect with nearby eligible donors via SMS/WhatsApp — saving critical time when it matters most.
+BloodLink NG is a Django MVP for connecting blood requesters with compatible, eligible donors in Nigeria. It currently uses Django templates and SQLite.
 
-## Key Features and Functionality
+## Implemented features
 
-1. **Donor Registration** — Sign up with blood type, genotype, location, phone number, and an availability toggle.
-2. **Location-Based Search** — Find nearby compatible donors sorted by distance, filtered by availability and eligibility (90-day donation gap).
-3. **Request & Notification System** — Submit urgent blood requests; nearby donors are alerted via SMS/WhatsApp and can respond instantly.
-4. **Eligibility Tracking** — Auto-tracks last donation date to ensure donors are only matched when medically eligible to donate again.
-5. **Verification & Trust Layer** — Hospital verification badges, spam rate-limiting on requests, and donor donation history for credibility.
+- Donor registration with password validation, login/logout, donor profile editing, phone normalization, blood type, genotype, last donation date, and availability.
+- Donor search by recipient blood type, state/LGA location, and availability. Compatibility is centralized and eligibility requires at least 90 days since the last donation.
+- Blood request creation, urgency-ordered request board, request details, token-protected request management, and status changes.
+- Matching donor alerts, a My alerts page (alerts sent to the donor plus open requests that match them), individual token-based replies, duplicate-alert protection, alert expiry, and a notification outbox. The default notification backend logs messages locally; it does **not** send real SMS/WhatsApp.
+- Admin management of donors, requests, alerts, and notification logs. Staff can mark a hospital request as verified after independently checking it. Verification is a staff-controlled badge, not an automatic identity check.
+- Basic request spam throttling by IP and phone using Django's local-memory cache. For multiple app workers, configure a shared cache (for example Redis).
+- Responsive templates, keyboard focus styles, reduced-motion support, and mobile navigation refinements.
 
-## Tech Stack
+## Current limitations
 
-- **Backend:** Django + Django REST Framework
-- **Database:** PostgreSQL (with PostGIS for geo-based search)
-- **Task Queue:** Celery + Redis (for async SMS/WhatsApp notifications)
-- **Notifications:** Termii / Africa's Talking / Twilio (SMS & WhatsApp)
-- **Frontend:** Django templates + HTMX (or a separate mobile app consuming the REST API)
+- Locations are picked from state and LGA dropdowns (all 36 states plus the FCT, 774 LGAs, in `donors/locations.py`) and stored as text like `Ikeja, Lagos`. Matching is a case-insensitive text match, not distance/radius matching, so a request for a whole state matches every donor in it. No coordinates or PostGIS are configured.
+- Real SMS/WhatsApp delivery requires a provider backend and credentials. No provider credentials are included.
+- The local-memory rate limiter resets when the process restarts and is not shared across workers.
+- Hospital verification requires staff review in Django admin; it is not an automated verification service.
+- This is an MVP, not a substitute for clinical screening. Donor suitability must be confirmed by qualified medical personnel.
 
-## Project Structure (Planned)
+## Requirements
 
-```
-bloodlink_ng/
-├── donors/          # Donor registration, profiles, availability
-├── requests/        # Blood requests, matching logic
-├── notifications/   # SMS/WhatsApp alert handling (Celery tasks)
-├── verification/    # Hospital verification, trust/reputation logic
-├── core/            # Shared utilities, settings
-└── manage.py
-```
+Python 3.12+ and the Django version pinned in `requirements.txt`.
 
-## Build Order
-
-1. Donor Registration
-2. Location-Based Search & Matching
-3. Request & Notification System
-4. Verification & Trust Layer
-
-## Getting Started
+## Setup
 
 ```bash
-
-## step 1
-# Create virtual environment
-python3 -m venv venv
-source venv/bin/activate
-
-## step 2
-# Install dependencies
-pip install -r requirements.txt
-
-## step 3
-# Run migrations
+python3 -m venv .venv
+source .venv/bin/activate  # Windows: .venv\Scripts\activate
+python -m pip install -r requirements.txt
 python manage.py migrate
-
-## step 4
-# Start development server
+python manage.py createsuperuser
 python manage.py runserver
 ```
 
+Open `http://127.0.0.1:8000/`. Registration is at `/register/`, donor search at `/search/`, blood requests at `/requests/`, and Django admin at `/admin/`.
 
-## pip freeze command
-pip freeze > requirements.txt
+## Configuration
 
-## Environment Variables
+Settings may be configured using environment variables:
 
-```
-DATABASE_URL=
-SMS_API_KEY=
-SMS_API_SECRET=
-SECRET_KEY=
-DEBUG=True
-```
+- `SECRET_KEY`: secret key; set a strong random value outside development.
+- `DEBUG`: defaults to `True` for local development. Set `False` in production.
+- `ALLOWED_HOSTS`: comma-separated hostnames.
+- `TIME_ZONE`: defaults to `Africa/Lagos`.
+- `NOTIFICATION_BACKEND`: defaults to `blood_requests.notifications.ConsoleBackend`. A custom backend must implement `blood_requests.notifications.base.NotificationBackend`.
+- `CACHE_BACKEND`: optional Django cache backend dotted path; use shared cache for multi-worker deployments.
+- `SECURE_SSL_REDIRECT`: defaults to enabled when `DEBUG=False`; disable only if TLS is terminated/configured elsewhere.
 
-## Status
+SQLite remains the default database. Run `python manage.py makemigrations --check --dry-run` to check model/migration consistency and `python manage.py test` to run tests.
 
-🚧 In development — MVP phase.
+## Safety notes
+
+Donor phone numbers are personal data. Restrict production access, use HTTPS, secure backups, and configure an appropriate privacy/retention policy before launch. The default console notification backend is for development/demo use only.
 
 ## License
 
 MIT
 
-git config --global user.email "email_here"
+## Demo / seed data
 
-git config --global user.name "Full Name"
+A local demo database is included with clearly labelled `[DEMO]` donor profiles and blood requests. These records use fictional names and reserved test phone patterns; they are not login accounts and should never be treated as real donors. Existing records in the included SQLite database are preserved.
 
-## Registration server page
-for faith registration page u go or search for this server http://127.0.0.1:8000/
+To add or refresh demo records in your own local database:
 
-## For search server page
-and for the the search i was creating then realised i wasn't suppose to do that so this is the server http://127.0.0.1:8000/search/
+```bash
+python manage.py seed_demo_data
+```
 
-# TODO:
-no login page
-no password on registration
+This command is safe to re-run and does not create duplicate demo requests. To remove only seeded demo records:
+
+```bash
+python manage.py seed_demo_data --clear-demo
+```
+
+Use the seeded records to test donor search, blood-type compatibility, availability, 90-day eligibility, request listing, urgency/status display, and matching. Notification delivery remains local-only with the default console backend; seeding does not send messages. Do not use this demo database for production.

@@ -16,7 +16,7 @@
         <div class="form-grid">
           <div class="field">{{ form.name.label_tag }}{{ form.name }}{% for e in form.name.errors %}<p class="error">{{ e }}</p>{% endfor %}</div>
           <div class="field">{{ form.phone.label_tag }}{{ form.phone }}{% for e in form.phone.errors %}<p class="error">{{ e }}</p>{% endfor %}</div>
-          <div class="field full">{{ form.location.label_tag }}{{ form.location }}{% for e in form.location.errors %}<p class="error">{{ e }}</p>{% endfor %}</div>
+          {% include "donors/_location_fields.html" %}
           <div class="full">{% include "donors/choice_group.html" with field=form.blood_type %}</div>
           <div class="field">{{ form.genotype.label_tag }}{{ form.genotype }}{% for e in form.genotype.errors %}<p class="error">{{ e }}</p>{% endfor %}</div>
           <div class="field">{{ form.donation_status.label_tag }}{{ form.donation_status }}{% for e in form.donation_status.errors %}<p class="error">{{ e }}</p>{% endfor %}</div>
@@ -35,10 +35,25 @@
 </main>
 <script>
 (function () {
-  const status = document.getElementById("id_donation_status");
-  const field = document.getElementById("last-donation-field");
-  function update() { field.style.display = status && status.value === "before" ? "" : "none"; }
-  if (status) { status.addEventListener("change", update); update(); }
+  // donation_status is a radio group on the sign-up page and a <select> on
+  // the edit page, so read whichever one is present. (Looking it up by id
+  // finds the radio group's wrapper <div>, which has no value, and left the
+  // date field hidden for good.)
+  var field = document.getElementById("last-donation-field");
+  var inputs = document.querySelectorAll('[name="donation_status"]');
+  if (!field || !inputs.length) return;
+
+  function donatedBefore() {
+    var checked = document.querySelector('input[name="donation_status"]:checked');
+    var select = document.querySelector('select[name="donation_status"]');
+    var value = checked ? checked.value : (select ? select.value : "");
+    return value === "before";
+  }
+
+  function update() { field.style.display = donatedBefore() ? "" : "none"; }
+
+  inputs.forEach(function (input) { input.addEventListener("change", update); });
+  update();
 })();
 </script>
 {% endblock %}

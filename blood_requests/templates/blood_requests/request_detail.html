@@ -40,7 +40,7 @@
                     </div>
                     <div class="detail-row">
                         <dt>Hospital</dt>
-                        <dd>{{ blood_request.hospital|default:"Not specified" }}</dd>
+                        <dd>{{ blood_request.hospital|default:"Not specified" }} {% if blood_request.hospital and blood_request.hospital_verified %}<span class="pill pill-ok">Verified hospital</span>{% elif blood_request.hospital %}<span class="pill pill-quiet">Not verified</span>{% endif %}</dd>
                     </div>
                     <div class="detail-row">
                         <dt>Location</dt>

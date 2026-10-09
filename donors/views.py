@@ -1,5 +1,7 @@
 from django.contrib import messages
 from django.contrib.auth import login, logout
+from django.contrib.auth.models import User
+from django.utils import timezone
 from django.contrib.auth.decorators import login_required
 from django.db.models import Case, IntegerField, Value, When
 from django.shortcuts import redirect, render
@@ -8,8 +10,19 @@ from django.views.decorators.http import require_POST
 
 from .compatibility import ALL_BLOOD_TYPES, COMPATIBILITY, compatible_donor_types
 from .eligibility import eligibility_cutoff, eligible_q, next_eligible_date
-from .forms import DonorForm, DonorSearchForm, LoginForm, RegisterForm
-from .models import Donor
+from . import otp
+from .forms import (
+    DonorForm,
+    DonorSearchForm,
+    LoginForm,
+    OTPCodeForm,
+    PasswordResetConfirmForm,
+    PasswordResetRequestForm,
+    RegisterForm,
+)
+from .models import Donor, PhoneOTP
+from .ratelimit import client_ip, hit
+from .verification import verified_q
 
 
 # Donor blood type -> recipient types that can receive it. This is the
@@ -52,10 +65,16 @@ def register_donor(request):
         if form.is_valid():
             donor = form.save()
 
-            # Registering also signs the donor in.
+            # Registering also signs the donor in. The donor is not searchable
+            # or alertable until the texted code has been entered.
             login(request, donor.user)
 
-            return redirect("donor_dashboard")
+            status = otp.issue_code(
+                donor.phone, PhoneOTP.Purpose.SIGNUP, ip=client_ip(request)
+            )
+            _flash_issue_result(request, status)
+
+            return redirect("verify_phone")
 
     else:
         form = RegisterForm()
@@ -64,6 +83,132 @@ def register_donor(request):
         "form": form,
         "recipients_by_donor_type": RECIPIENTS_BY_DONOR_TYPE,
     })
+
+
+def _flash_issue_result(request, status):
+    if status == otp.SENT:
+        messages.success(request, "We texted you a 6-digit code.")
+    elif status == otp.COOLDOWN:
+        messages.info(request, "A code was sent a moment ago. Please wait a minute before asking for another.")
+    elif status == otp.THROTTLED:
+        messages.error(request, "Too many codes requested. Please try again later.")
+    else:
+        messages.error(request, "We could not send the text message. Please try again shortly.")
+
+
+@login_required(login_url="login")
+def verify_phone(request):
+    """Confirm the donor's number with the code texted to it (F2)."""
+    donor = current_donor(request)
+
+    if donor is None or donor.phone_verified_at:
+        return redirect("donor_dashboard")
+
+    form = OTPCodeForm()
+
+    if request.method == "POST":
+        if request.POST.get("action") == "send":
+            _flash_issue_result(
+                request,
+                otp.issue_code(donor.phone, PhoneOTP.Purpose.SIGNUP, ip=client_ip(request)),
+            )
+
+            return redirect("verify_phone")
+
+        form = OTPCodeForm(request.POST)
+
+        if form.is_valid():
+            outcome = otp.verify_code(
+                donor.phone, PhoneOTP.Purpose.SIGNUP, form.cleaned_data["code"]
+            )
+
+            if outcome == otp.OK:
+                donor.phone_verified_at = timezone.now()
+                donor.save(update_fields=["phone_verified_at"])
+                messages.success(request, "Your phone number is verified.")
+
+                return redirect("donor_dashboard")
+
+            if outcome == otp.LOCKED:
+                form.add_error("code", "Too many wrong attempts. Ask for a new code.")
+            elif outcome in (otp.EXPIRED, otp.NONE):
+                form.add_error("code", "That code has expired. Ask for a new one.")
+            else:
+                form.add_error("code", "That code is not correct.")
+
+    return render(request, "donors/verify_phone.html", {"form": form, "donor": donor})
+
+
+RESET_SESSION_KEY = "password_reset_phone"
+_GENERIC_RESET_NOTICE = (
+    "If that number is registered, we have texted it a code. "
+    "Enter the code below with your new password."
+)
+
+
+def password_reset_request(request):
+    """Step 1 of an SMS password reset. Identical response for every number."""
+    form = PasswordResetRequestForm(request.POST or None)
+
+    if request.method == "POST" and form.is_valid():
+        phone = form.cleaned_data["phone"]
+        ip = client_ip(request)
+
+        # Throttled before looking the number up, so the limits cannot be used
+        # to tell registered numbers from unregistered ones.
+        allowed = hit(f"reset:ip:{ip}", 10, 3600) and hit(f"reset:phone:{phone}", 5, 3600)
+
+        if allowed and User.objects.filter(username=phone, is_active=True).exists():
+            otp.issue_code(phone, PhoneOTP.Purpose.RESET, ip=ip)
+        else:
+            otp.dummy_work()
+
+        request.session[RESET_SESSION_KEY] = phone
+        messages.info(request, _GENERIC_RESET_NOTICE)
+
+        return redirect("password_reset_confirm")
+
+    return render(request, "donors/password_reset_request.html", {"form": form})
+
+
+def password_reset_confirm(request):
+    """Step 2: enter the code and choose a new password."""
+    phone = request.session.get(RESET_SESSION_KEY)
+
+    if not phone:
+        return redirect("password_reset_request")
+
+    user = User.objects.filter(username=phone, is_active=True).first()
+
+    if request.method == "POST":
+        form = PasswordResetConfirmForm(request.POST, user=user)
+
+        if form.is_valid():
+            outcome = otp.verify_code(phone, PhoneOTP.Purpose.RESET, form.cleaned_data["code"])
+
+            if outcome == otp.OK and user is not None:
+                user.set_password(form.cleaned_data["password1"])
+                user.save(update_fields=["password"])
+                # Changing the password changes the session auth hash, which
+                # logs out every other session for this user.
+
+                donor = Donor.objects.filter(user=user).first()
+                if donor and not donor.phone_verified_at:
+                    # They just proved they control this number.
+                    donor.phone_verified_at = timezone.now()
+                    donor.save(update_fields=["phone_verified_at"])
+
+                request.session.pop(RESET_SESSION_KEY, None)
+                messages.success(request, "Your password has been changed. Please log in.")
+
+                return redirect("login")
+
+            # One message for wrong, expired, locked and unknown numbers.
+            form.add_error("code", "That code is incorrect or has expired.")
+    else:
+        form = PasswordResetConfirmForm(user=user)
+
+    return render(request, "donors/password_reset_confirm.html", {"form": form, "phone": phone})
 
 
 def login_view(request):
@@ -130,6 +275,9 @@ def donor_dashboard(request):
         "ninety_days_ago": ninety_days_ago,
         "is_eligible": is_eligible,
         "next_eligible_date": next_date,
+        "phone_verified": bool(donor and donor.phone_verified_at),
+        "history": donor.donations.filter(confirmed_by_donor_at__isnull=False)[:20] if donor else [],
+        "pending_donations": donor.donations.filter(confirmed_by_donor_at__isnull=True) if donor else [],
     })
 
 
@@ -151,6 +299,11 @@ def edit_donor(request):
             form.save()
 
             messages.success(request, "Your profile has been updated.")
+
+            if "phone" in form.changed_data:
+                messages.info(request, "You changed your number, so please verify it again.")
+
+                return redirect("verify_phone")
 
             return redirect("donor_dashboard")
 
@@ -192,7 +345,7 @@ def search_donors(request):
     # relying on form.is_valid() here would silently skip the rule.
     ninety_days_ago = eligibility_cutoff()
 
-    donors = donors.filter(eligible_q())
+    donors = donors.filter(eligible_q()).filter(verified_q())
 
     # The person searching is not a match for themselves.
     me = current_donor(request)

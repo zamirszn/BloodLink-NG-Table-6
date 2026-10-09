@@ -98,6 +98,13 @@
                         This request is {{ blood_request.get_status_display|lower }},
                         so no further donors can be alerted.
                     </p>
+                {% elif not blood_request.requester_phone_verified_at %}
+                    <p class="status-note status-note-bad">
+                        Verify {{ blood_request.requester_phone }} before alerting donors.
+                        This stops anyone sending alerts in someone else's name.
+                    </p>
+                    <a class="btn btn-block" style="margin-top:12px"
+                       href="{% url 'blood_requests:requester_verify' token=blood_request.status_token %}">Verify my phone</a>
                 {% elif pending_count %}
                     <form method="POST"
                           action="{% url 'blood_requests:blood_request_notify' token=blood_request.status_token %}">
@@ -120,6 +127,27 @@
                     <p class="status-note status-note-neutral">
                         Every matching donor has already been alerted for this request.
                     </p>
+                {% endif %}
+
+                {% if failed_count %}
+                    <form method="POST" action="{% url 'blood_requests:blood_request_retry' token=blood_request.status_token %}">
+                        {% csrf_token %}
+                        <p class="status-note status-note-bad">{{ failed_count }} alert{{ failed_count|pluralize }} did not reach the donor's phone.</p>
+                        <button class="btn btn-ghost btn-block" type="submit" style="margin-top:8px">Retry failed alerts</button>
+                    </form>
+                {% endif %}
+
+                <div class="detail-row" style="margin-top:14px">
+                    <dt>{% if blood_request.status == "expired" %}Expired{% else %}Closes{% endif %}</dt>
+                    <dd>{{ blood_request.expires_at|date:"d M Y, H:i"|default:"No expiry" }}</dd>
+                </div>
+                {% if blood_request.can_extend %}
+                    <form method="POST" action="{% url 'blood_requests:blood_request_extend' token=blood_request.status_token %}">
+                        {% csrf_token %}
+                        <button class="btn btn-ghost btn-block" type="submit" style="margin-top:8px">
+                            {% if blood_request.status == "expired" %}Reopen and extend{% else %}Extend this request{% endif %}
+                        </button>
+                    </form>
                 {% endif %}
 
                 <p class="status-note status-note-neutral">
@@ -148,7 +176,7 @@
                                         {% else %}
                                             <span>Phone not provided</span>
                                         {% endif %}
-                                        <span>Alerted {{ alert.created_at|date:"d M Y" }}</span>
+                                        <span>{% if alert.source == "volunteer" %}Volunteered{% else %}Alerted{% endif %} {{ alert.created_at|date:"d M Y" }}</span>
                                     </div>
                                 </div>
                                 <div class="blood-badge">{{ alert.donor.blood_type }}</div>
@@ -161,10 +189,31 @@
                                     <span class="pill pill-quiet">Not available</span>
                                 {% elif alert.delivery_status == "failed" %}
                                     <span class="pill pill-alert">Not delivered</span>
+                                {% elif alert.delivery_status == "sending" %}
+                                    <span class="pill pill-quiet">Sending…</span>
+                                {% elif alert.delivery_status == "delivered" %}
+                                    <span class="pill pill-urgent">Delivered · awaiting reply</span>
                                 {% else %}
                                     <span class="pill pill-urgent">Awaiting reply</span>
                                 {% endif %}
                             </div>
+
+                            {% if alert.response == "available" and blood_request.is_open or alert.donation %}
+                                <div class="donor-actions">
+                                    {% if alert.donation %}
+                                        {% if alert.donation.confirmed_by_donor_at %}
+                                            <span class="pill pill-ok">Donation confirmed by donor</span>
+                                        {% else %}
+                                            <span class="pill pill-quiet">Donation recorded · waiting for the donor to confirm</span>
+                                        {% endif %}
+                                    {% else %}
+                                        <form method="POST" action="{% url 'blood_requests:record_donation' token=blood_request.status_token alert_id=alert.pk %}">
+                                            {% csrf_token %}
+                                            <button class="btn btn-sm btn-ghost" type="submit">Mark as donated</button>
+                                        </form>
+                                    {% endif %}
+                                </div>
+                            {% endif %}
 
                             {% if alert.donor.tel_phone %}
                                 <div class="donor-actions">

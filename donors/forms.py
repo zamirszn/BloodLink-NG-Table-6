@@ -8,6 +8,7 @@ from django.core.exceptions import ValidationError
 from django.db import transaction
 
 from .compatibility import ALL_BLOOD_TYPES
+from .locations import STATE_CHOICES, compose_location, lgas_for, split_location
 from .models import Donor
 from .phone import normalize_ng_phone
 
@@ -23,7 +24,87 @@ class ControlMixin:
                 field.widget.attrs.setdefault("class", "control")
 
 
-class DonorForm(ControlMixin, forms.ModelForm):
+class LocationFieldsMixin:
+    """State + LGA dropdowns that together produce one ``location`` string.
+
+    Adds two form fields, ``state`` and ``lga``, and on a valid form puts
+    ``"<LGA>, <State>"`` (or just the state) into ``cleaned_data["location"]``.
+    On a ModelForm whose model has a ``location`` column it also copies that
+    onto the instance, so ``save()`` stores it without the column having to
+    be a form field. Set ``location_required = False`` for filters and for
+    forms where a blank location is allowed.
+    """
+
+    location_required = True
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        required = self.location_required
+
+        self.fields["state"] = forms.ChoiceField(
+            label="State",
+            required=required,
+            choices=[("", "Select state")] + STATE_CHOICES,
+            widget=forms.Select(attrs={"class": "control", "autocomplete": "address-level1"}),
+        )
+        self.fields["lga"] = forms.CharField(
+            label="Local government area (LGA)",
+            required=required,
+            widget=forms.Select(attrs={"class": "control", "autocomplete": "address-level2"}),
+        )
+
+        # Editing an existing record: work the dropdowns out from what was
+        # stored (including older free-text values).
+        instance = getattr(self, "instance", None)
+
+        if instance is not None and instance.pk and "state" not in self.initial:
+            state, lga = split_location(instance.location)
+            self.initial.setdefault("state", state)
+            self.initial.setdefault("lga", lga)
+
+        if self.is_bound:
+            state = self.data.get(self.add_prefix("state"), "")
+        else:
+            state = self.initial.get("state", "")
+
+        self.fields["lga"].widget.choices = self._lga_choices(state)
+        self.fields["lga"].widget.attrs["data-any-label"] = (
+            "Select LGA" if required else "Any LGA in this state"
+        )
+
+    def _lga_choices(self, state):
+        lgas = lgas_for(state)
+
+        if not lgas:
+            return [("", "Select a state first")]
+
+        first = "Select LGA" if self.location_required else "Any LGA in this state"
+
+        return [("", first)] + [(lga, lga) for lga in lgas]
+
+    def clean(self):
+        cleaned_data = super().clean()
+
+        state = cleaned_data.get("state", "")
+        lga = (cleaned_data.get("lga") or "").strip()
+
+        if state and lga and lga not in lgas_for(state):
+            self.add_error("lga", "Choose a local government area from the list.")
+            lga = ""
+
+        location = compose_location(state, lga)
+        cleaned_data["location"] = location
+
+        instance = getattr(self, "instance", None)
+
+        if instance is not None and hasattr(instance, "location"):
+            instance.location = location
+
+        return cleaned_data
+
+
+class DonorForm(LocationFieldsMixin, ControlMixin, forms.ModelForm):
     """The donor profile. Used to edit an existing donor."""
 
     BLOOD_TYPES = [
@@ -77,7 +158,6 @@ class DonorForm(ControlMixin, forms.ModelForm):
             "name",
             "blood_type",
             "genotype",
-            "location",
             "phone",
             "donation_status",
             "last_donation",
@@ -90,10 +170,6 @@ class DonorForm(ControlMixin, forms.ModelForm):
         self.fields["name"].label = "Full name"
         self.fields["name"].widget.attrs.update(
             placeholder="e.g. Chiamaka Okafor", autocomplete="name"
-        )
-        self.fields["location"].widget.attrs.update(
-            placeholder="Area and city, e.g. Yaba, Lagos",
-            autocomplete="address-level2",
         )
         self.fields["phone"].label = "Phone number"
         self.fields["phone"].widget.attrs.update(
@@ -150,6 +226,14 @@ class DonorForm(ControlMixin, forms.ModelForm):
         return cleaned_data
 
     def save(self, commit=True):
+        # A changed number is a different number: it must be verified again.
+        if self.instance.pk and "phone" in self.changed_data:
+            self.instance.phone_verified_at = None
+            self.instance.verification_grace = False
+
+        if self.instance.pk and "availability" in self.changed_data and self.instance.availability:
+            self.instance.sms_opt_out = False
+
         donor = super().save(commit=commit)
 
         # Keep the login username in step with the phone number.
@@ -293,7 +377,9 @@ class LoginForm(ControlMixin, forms.Form):
         return cleaned_data
 
 
-class DonorSearchForm(ControlMixin, forms.Form):
+class DonorSearchForm(LocationFieldsMixin, ControlMixin, forms.Form):
+
+    location_required = False
 
     blood_type = forms.ChoiceField(
         label="Blood type of the person who needs blood",
@@ -310,15 +396,6 @@ class DonorSearchForm(ControlMixin, forms.Form):
         widget=forms.RadioSelect,
     )
 
-    location = forms.CharField(
-        max_length=200,
-        required=False,
-        label="Location",
-        widget=forms.TextInput(attrs={
-            "placeholder": "Area or city, e.g. Ikeja",
-        }),
-    )
-
     availability = forms.ChoiceField(
         choices=[
             ("", "Any availability"),
@@ -328,3 +405,78 @@ class DonorSearchForm(ControlMixin, forms.Form):
         required=False,
         label="Availability"
     )
+
+
+class OTPCodeForm(ControlMixin, forms.Form):
+    code = forms.CharField(
+        label="6-digit code",
+        max_length=6,
+        min_length=6,
+        widget=forms.TextInput(attrs={
+            "inputmode": "numeric",
+            "autocomplete": "one-time-code",
+            "pattern": "[0-9]{6}",
+            "autofocus": True,
+        }),
+    )
+
+    def clean_code(self):
+        code = self.cleaned_data["code"].strip()
+
+        if not code.isdigit():
+            raise ValidationError("Enter the 6 digits from the text message.")
+
+        return code
+
+
+class PasswordResetRequestForm(ControlMixin, forms.Form):
+    phone = forms.CharField(
+        label="Phone number",
+        widget=forms.TextInput(attrs={
+            "placeholder": "0803 123 4567",
+            "inputmode": "tel",
+            "autocomplete": "tel",
+            "autofocus": True,
+        }),
+    )
+
+    def clean_phone(self):
+        phone = normalize_ng_phone(self.cleaned_data["phone"])
+
+        if phone is None:
+            raise ValidationError("Enter a valid Nigerian mobile number.")
+
+        return phone
+
+
+class PasswordResetConfirmForm(OTPCodeForm):
+    password1 = forms.CharField(
+        label="New password",
+        strip=False,
+        widget=forms.PasswordInput(attrs={"autocomplete": "new-password"}),
+    )
+    password2 = forms.CharField(
+        label="Confirm new password",
+        strip=False,
+        widget=forms.PasswordInput(attrs={"autocomplete": "new-password"}),
+    )
+
+    def __init__(self, *args, user=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.user = user
+        self.fields["code"].widget.attrs.pop("autofocus", None)
+
+    def clean(self):
+        cleaned_data = super().clean()
+        password1 = cleaned_data.get("password1")
+        password2 = cleaned_data.get("password2")
+
+        if password1 and password2 and password1 != password2:
+            self.add_error("password2", "The two passwords do not match.")
+        elif password1:
+            try:
+                validate_password(password1, user=self.user)
+            except ValidationError as error:
+                self.add_error("password1", error)
+
+        return cleaned_data

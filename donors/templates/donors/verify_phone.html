@@ -1,0 +1,22 @@
+{% extends "donors/base.html" %}
+{% block title %}Verify your phone — BloodLink NG{% endblock %}
+{% block content %}
+<main class="auth-wrap">
+  <div class="card auth-card">
+    <div class="eyebrow">One more step</div>
+    <h1>Verify your phone</h1>
+    <p class="lead">Enter the 6-digit code we texted to <strong>{{ donor.phone }}</strong>. Until it is verified you will not appear in donor search and will not receive alerts.</p>
+    <form method="post" novalidate>
+      {% csrf_token %}
+      {% include "donors/_field.html" with field=form.code %}
+      <button class="btn btn-block" type="submit">Verify</button>
+    </form>
+    <form method="post" style="margin-top:14px">
+      {% csrf_token %}
+      <input type="hidden" name="action" value="send">
+      <button class="btn btn-ghost btn-block" type="submit">Send me a new code</button>
+    </form>
+    <p class="auth-alt">Wrong number? <a href="{% url 'edit_donor' %}">Edit your profile</a>.</p>
+  </div>
+</main>
+{% endblock %}

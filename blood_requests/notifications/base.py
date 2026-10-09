@@ -31,6 +31,13 @@ class DeliveryResult:
 
     detail: str = ""
 
+    #: The provider's own id for the message, used to match delivery receipts.
+    provider_message_id: str = ""
+
+    #: True when a failure is worth retrying (timeout, 5xx, rate limit); False
+    #: when retrying cannot help (bad number, bad credentials, rejected).
+    retryable: bool = False
+
 
 class NotificationBackend(ABC):
     """Base class for delivery backends."""
